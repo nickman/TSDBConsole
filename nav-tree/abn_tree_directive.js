@@ -1,7 +1,7 @@
 app.directive('abnTree', function($timeout) {
   return {
     restrict: 'E',
-    templateUrl: '/nav-tree/abn_tree_template.html',
+    templateUrl: 'nav-tree/abn_tree_template.html',
     scope: {
       treeData: '=',
       onSelect: '&',
