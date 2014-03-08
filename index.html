@@ -8,13 +8,21 @@
     
     
 	<title>OpenTSDB Console</title>
-	<link rel="stylesheet" type="text/css" href="/bootstrap/css/bootstrap.min.css" />	
+	<link rel="stylesheet" type="text/css" href="bootstrap/noicons.css" />	
 	<link rel="stylesheet" type="text/css" href="/nav-tree/abn_tree.css" />	
 	<link rel="stylesheet" type="text/css" href="/css/boot.css" />
-	<link rel="stylesheet" type="text/css" href="/font-awesome/css/font-awesome.min.css" />
+	<link rel="stylesheet" type="text/css" href="font-awesome/css/font-awesome.css" />
+<style>
+i.fa {
+ font-family: 'FontAwesome';
+}	
+</style>
 </head>
 <body data-ng-app="tsdbConsole" data-ng-csp>	
 	<h3>OpenTSDB Console</h3>
+	<i class="fa fa-search"></i>
+	<i class="fa icon-chevron-right"></i>
+	
 	<div ng-controller="tsdbConsoleController">
 		<p>{{greeting}} {{person}}</p>
 		<input ng-model="greeting">
@@ -34,6 +42,7 @@
 	      </tr>
 	    </table>	
     </div>	
+    
     <script type="text/javascript" src="/js/angular-1.2.14.js"></script>
     <script type="text/javascript" src="/js/angular-animate.js"></script>
     <script type="text/javascript" src="index.js"></script>

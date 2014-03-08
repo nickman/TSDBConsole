@@ -25,10 +25,11 @@
           "tts",
           "contextMenus",
           "fileBrowserHandler",
-          "idle",
+          "idle",          
           "http://*/*",
           {"socket" : ["tcp-connect", "tcp-listen", "udp-send-to", "udp-bind"]}
           
      ],
+
      "manifest_version": 2
 }

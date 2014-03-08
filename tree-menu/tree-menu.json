@@ -1,0 +1,79 @@
+[
+
+    {
+      label: "Status",
+      data: {
+        description: "OpenTSDB Environment Dashboards"
+      }
+    }, 
+
+    {
+      label: "Dashboards",
+      data: {
+        description: "User Defined Dashboards"
+      },
+    },
+
+    {
+      label: "OpenTSDB Dashboard",
+      data: {
+        description: "The native OpenTSDB Dashboard and Gnuplot URL Snapshot Manager"
+      },
+    },
+
+    {
+      label: "Tools",
+      data: {
+        description: "OpenTSDB Tools",
+        children: [
+          {
+            label: "Fsck",
+            data: {
+              description: "Repair tool for OpenTSDB HBase time series data stores"
+            },
+          },
+          {
+            label: "Import",
+            data: {
+              description: "High speed data import of data files into OpenTSDB"
+            },
+          },
+          {
+            label: "UID Manager",
+            data: {
+              description: "Bulk meta-data management tools"
+            },
+          },
+          {
+            label: "Query",
+            data: {
+              description: "Basic data query"
+            },
+          },
+          {
+            label: "Dump",
+            data: {
+              description: "Bulk Data Export"
+            },
+          }
+        ]
+      }
+    },
+    {
+      label: "Meta",
+      data: {
+        description: "Browser and Editor for OpenTSDB meta-data"
+      },
+    },
+    {
+      label: "Trees",
+      data: {
+        description: "OpenTSDB Tree and Rule Management"
+      },
+    },
+
+
+
+  ];
+
+

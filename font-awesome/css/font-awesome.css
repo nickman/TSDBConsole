@@ -4,13 +4,35 @@
  */
 /* FONT PATH
  * -------------------------- */
+ @font-face {
+  font-family: 'FontAwesome';    
+  src: url("chrome-extension://hhidnogedflbmmiedbohigocepkplgbk/font-awesome/fonts/fontawesome-webfont.eot");
+  src:
+    url("chrome-extension://hhidnogedflbmmiedbohigocepkplgbk/font-awesome/fonts/fontawesome-webfont.woff") format("woff"),
+    url("chrome-extension://hhidnogedflbmmiedbohigocepkplgbk/font-awesome/fonts/fontawesome-webfont.otf") format("opentype"),
+    url("chrome-extension://hhidnogedflbmmiedbohigocepkplgbk/font-awesome/fonts/fontawesome-webfont.svg") format("svg");
+  }
+
+/*
+@font-face {
+    font-family: 'FontAwesome';    
+    src: url('chrome-extension://hhidnogedflbmmiedbohigocepkplgbk/font-awesome/fonts/fontawesome-webfont.woff') format('woff');  
+}
+body {
+  background-image:url('chrome-extension://__MSG_@@extension_id__/background.png');
+  src: url('../fonts/fontawesome-webfont.woff');
+  src: url('chrome-extension://__MSG_@@extension_id__/font-awesome/fonts/fontawesome-webfont.woff');
+}
+
+
 @font-face {
   font-family: 'FontAwesome';
-  src: url('/font-awesome/fonts/fontawesome-webfont.eot?v=4.0.3');
-  src: url('/font-awesome/fonts/fontawesome-webfont.eot?#iefix&v=4.0.3') format('embedded-opentype'), url('/font-awesome/fonts/fontawesome-webfont.woff?v=4.0.3') format('woff'), url('/font-awesome/fonts/fontawesome-webfont.ttf?v=4.0.3') format('truetype'), url('/font-awesome/fonts/fontawesome-webfont.svg?v=4.0.3#fontawesomeregular') format('svg');
+  src: url('../fonts/fontawesome-webfont.eot?v=4.0.3');
+  src: url('../fonts/fontawesome-webfont.eot?#iefix&v=4.0.3') format('embedded-opentype'), url('../fonts/fontawesome-webfont.woff?v=4.0.3') format('woff'), url('../fonts/fontawesome-webfont.ttf?v=4.0.3') format('truetype'), url('../fonts/fontawesome-webfont.svg?v=4.0.3#fontawesomeregular') format('svg');
   font-weight: normal;
   font-style: normal;
 }
+*/
 .fa {
   display: inline-block;
   font-family: FontAwesome;
