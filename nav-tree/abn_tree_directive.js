@@ -8,15 +8,16 @@ app.directive('abnTree', function($timeout) {
       initialSelection: '='
     },
     link: function(scope, element, attrs) {
+      console.info("Link: scope:[%O], element:[%O], attrs:[%O]", scope, element, attrs);
       var expand_level, for_each_branch, on_treeData_change, select_branch, selected_branch;
       if (attrs.iconExpand == null) {
-        attrs.iconExpand = 'icon-plus';
+        attrs.iconExpand = 'fa-plus';
       }
       if (attrs.iconCollapse == null) {
-        attrs.iconCollapse = 'icon-minus';
+        attrs.iconCollapse = 'fa-minus';
       }
       if (attrs.iconLeaf == null) {
-        attrs.iconLeaf = 'icon-chevron-right';
+        attrs.iconLeaf = 'fa-chevron-right';
       }
       if (attrs.expandLevel == null) {
         attrs.expandLevel = '3';
@@ -24,16 +25,14 @@ app.directive('abnTree', function($timeout) {
       expand_level = parseInt(attrs.expandLevel, 10);
       scope.header = attrs.header;
       if (!scope.treeData) {
-        alert('no treeData defined for the tree!');
-        debugger;
+        console.error('no treeData defined for the tree!');
         return;
       }
       if (scope.treeData.length == null) {
         if (treeData.label != null) {
           scope.treeData = [treeData];
         } else {
-          alert('treeData should be an array of root branches');
-          debugger;
+          console.error('treeData should be an array of root branches');          
           return;
         }
       }
@@ -124,13 +123,18 @@ app.directive('abnTree', function($timeout) {
           if (branch.expanded == null) {
             branch.expanded = false;
           }
-          if (!branch.children || branch.children.length === 0) {
-            tree_icon = attrs.iconLeaf;
+          var cicon = branch.icon;
+          if(cicon!=null) {
+            tree_icon = cicon;  
           } else {
-            if (branch.expanded) {
-              tree_icon = attrs.iconCollapse;
+            if (!branch.children || branch.children.length === 0) {
+              tree_icon = attrs.iconLeaf;
             } else {
-              tree_icon = attrs.iconExpand;
+              if (branch.expanded) {
+                tree_icon = attrs.iconCollapse;
+              } else {
+                tree_icon = attrs.iconExpand;
+              }
             }
           }
           scope.tree_rows.push({

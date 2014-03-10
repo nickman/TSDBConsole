@@ -2,52 +2,108 @@
 <html lang="en-US">
 <head>
     <meta charset="UTF-8">
-
+	<title>OpenTSDB Console</title>
     <script type="text/javascript" src="/js/jquery-2.0.3.js"></script>
     <script type="text/javascript" src="/bootstrap/js/bootstrap.min.js"></script>
-    
-    
-	<title>OpenTSDB Console</title>
 	<link rel="stylesheet" type="text/css" href="bootstrap/noicons.css" />	
 	<link rel="stylesheet" type="text/css" href="/nav-tree/abn_tree.css" />	
 	<link rel="stylesheet" type="text/css" href="/css/boot.css" />
+	<link rel="stylesheet" type="text/css" href="/css/flexy-layout.css" />	
 	<link rel="stylesheet" type="text/css" href="font-awesome/css/font-awesome.css" />
 <style>
-i.fa {
+.tree-icon {
  font-family: 'FontAwesome';
+ font-style: normal;
 }	
 </style>
 </head>
 <body data-ng-app="tsdbConsole" data-ng-csp>	
-	<h3>OpenTSDB Console</h3>
-	<i class="fa fa-search"></i>
-	<i class="fa icon-chevron-right"></i>
-	
-	<div ng-controller="tsdbConsoleController">
-		<p>{{greeting}} {{person}}</p>
-		<input ng-model="greeting">
-		<input ng-model="person">
-	</div>
-	<div>
-	   <table ng-controller="AbnTestController">
-	      <tr>
-	        <td>
-	          <div style="width:250px;margin-left:0px;background:whitesmoke;border:1px solid lightgray;border-radius:5px;">
-	            <abn-tree tree-data="example_treedata" icon-leaf="icon-file" on-select="my_tree_handler(branch)" expand-level="2" initial-selection="Vegetable"></abn-tree>
-	          </div>
-	        </td>
-	        <td style="padding:20px;vertical-align:top;">
-	          <div style="width:300px" class="alert alert-warning">{{ output }}</div>
-	        </td>
-	      </tr>
-	    </table>	
-    </div>	
+	<flexy-layout orientation="vertical">
+		<!-- The header bar -->
+		<block-container init="30">
+		    <div id="appHeader">
+				<!-- <span><h3>OpenTSDB Console</h3><i class="fawesome fa-search"></i></span> -->
+				<div class="subg" style="display: inline-block; vertical-align: middle;">
+					<div style="display: inline-block;vertical-align: middle;"><b><font color="#c71a32" size="5">T</font><font color="#00a189" size="5">S</font><font color="#1a65b7" size="5">D</font>&nbsp;&nbsp;</b></div>
+					<div style="vertical-align: middle; display: inline-block; background-color: #e2f4f7;"><font color="#507e9b"><b>Time Series Database Console</b></font></div>					
+				</div>
+				<div style="display: inline-block;vertical-align: middle; padding-top: 1px;">&nbsp;&nbsp;&nbsp;&nbsp;
+					<button type="button" id="loginBtn" class="btn btn-default" ng-click="open()" style="display: inline-block; vertical-align: middle;">Connect</button>
+				</div>
+
+<div ng-controller="ModalDemoCtrl" class="ng-scope">
+    <script type="text/ng-template" id="myModalContent.html">
+    	// HTML Content
+
+    </script>
+
+    <button class="btn btn-default" ng-click="open()">Open me!</button>
+    <div ng-show="selected" class="ng-binding">Selection from a modal: item1</div>
+</div>
+
+
+
+
+
+
+		    </div>
+		</block-container>
+
+		<!-- App Area -->
+		<block-container>
+			<flexy-layout orientation="horizontal">
+				<!-- Tree Menu Column -->
+				<block-container init="200">
+				    <div id="treeMenu" class="treeMenuBlock">
+				    </div>
+				    <div ng-controller="treeMenuController" id="treeMenuController" style="display: none;">
+				    	<abn-tree tree-data="example_treedata" icon-leaf="fa-chevron-circle-right" on-select="my_tree_handler(branch)" expand-level="2" initial-selection="Status"> 
+
+				    	</abn-tree>
+				    </div>
+				</block-container>
+				
+				<block-splitter></block-splitter>
+
+				<!-- Work Area -->
+				<block-container>
+					<flexy-layout orientation="vertical">
+						<!-- Work Area Menu -->
+						<block-container init="20">
+						    <div id="workAreaMenu">
+						    	<!-- <p>{{applet.name}}</p> -->
+								<p>Menu</p>
+				    		</div>
+						</block-container>
+						<!--<block-splitter></block-splitter> -->
+						<!-- Work Area Display -->
+						<block-container>
+						    <div id="workAreaDisplay">
+								<p>Display</p>
+				    		</div>
+						</block-container>
+
+					</flexy-layout>
+				</block-container>
+			</flexy-layout>			
+		</block-container>
+
+		<!-- The footer bar -->
+		<block-container init="20">
+		    <div>
+		        <a href="http://www.opentsdb.net" target="_opentsdb">OpenTSDB</a>, 2014.
+		    </div>
+		</block-container>
+		
+
+	</flexy-layout>
+
     
     <script type="text/javascript" src="/js/angular-1.2.14.js"></script>
     <script type="text/javascript" src="/js/angular-animate.js"></script>
     <script type="text/javascript" src="index.js"></script>
     <script type="text/javascript" src="/nav-tree/abn_tree_directive.js"></script>
-    <!-- <script type="text/javascript" src="/nav-tree/test_data.js"></script>  -->
     <script type="text/javascript" src="/js/ui-bootstrap-0.9.0.js"></script>    	
+    <script type="text/javascript" src="/js/flexy-layout.min.js"></script>
 </body>
 </html>
