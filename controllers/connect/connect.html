@@ -1,22 +1,25 @@
-<div ng-controller="ModalConnectCtrl">
-    <script type="text/ng-template" id="myModalContent.html">
+<div ng-controller="connectModal">
+    
         <div class="modal-header">
-            <h3>Connect to an OpenTSDB Server</h3>
+            <h5>Connect to an OpenTSDB Server</h5>
         </div>
-        <div class="modal-body">
+
+
+        <div class="modal-body" ng-controller="connectModal" ng-model="ConnectionModel">
             <ul>
-                <li ng-repeat="item in items">
-                    <a ng-click="selected.item = item">{{ item }}</a>
+                <li ng-repeat="knownConnection in knownConnections">
+                    <a ng-click="selected.item = item">{{ knownConnection.url }}</a>
                 </li>
-            </ul>
-            Selected: <b>{{ selected.item }}</b>
+            </ul>        
+            <table><tr>            
+                <td>Server:</td><td><input type="text" ng-model="dynamicPopover" class="form-control" id="selectedServer"></td>
+            </tr><tr style="vertical-align: middle;">
+                <td style="vertical-align: middle;">Make Default:</td><td><input style="vertical-align: top;" type="checkbox" id="mkDef"></td>
+            </tr></table>            
         </div>
         <div class="modal-footer">
             <button class="btn btn-primary" ng-click="ok()">OK</button>
             <button class="btn btn-warning" ng-click="cancel()">Cancel</button>
         </div>
-    </script>
-
-    <button class="btn btn-default" ng-click="open()">Open me!</button>
-    <div ng-show="selected">Selection from a modal: {{ selected }}</div>
+    
 </div>

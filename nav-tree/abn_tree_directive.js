@@ -1,4 +1,4 @@
-app.directive('abnTree', function($timeout) {
+tsdbConsoleApp.directive('abnTree', function($timeout) {
   return {
     restrict: 'E',
     templateUrl: 'nav-tree/abn_tree_template.html',
@@ -8,7 +8,6 @@ app.directive('abnTree', function($timeout) {
       initialSelection: '='
     },
     link: function(scope, element, attrs) {
-      console.info("Link: scope:[%O], element:[%O], attrs:[%O]", scope, element, attrs);
       var expand_level, for_each_branch, on_treeData_change, select_branch, selected_branch;
       if (attrs.iconExpand == null) {
         attrs.iconExpand = 'fa-plus';

@@ -20,7 +20,7 @@
 <body data-ng-app="tsdbConsole" data-ng-csp>	
 	<flexy-layout orientation="vertical">
 		<!-- The header bar -->
-		<block-container init="30">
+		<block-container init="35">
 		    <div id="appHeader">
 				<!-- <span><h3>OpenTSDB Console</h3><i class="fawesome fa-search"></i></span> -->
 				<div class="subg" style="display: inline-block; vertical-align: middle;">
@@ -28,18 +28,12 @@
 					<div style="vertical-align: middle; display: inline-block; background-color: #e2f4f7;"><font color="#507e9b"><b>Time Series Database Console</b></font></div>					
 				</div>
 				<div style="display: inline-block;vertical-align: middle; padding-top: 1px;">&nbsp;&nbsp;&nbsp;&nbsp;
-					<button type="button" id="loginBtn" class="btn btn-default" ng-click="open()" style="display: inline-block; vertical-align: middle;">Connect</button>
+					<div ng-controller="connectModal" class="ng-scope" style="display: inline-block;vertical-align: middle; padding-top: 1px;">
+						<button type="button" id="loginBtn" class="btn btn-default" ng-click="open()" style="display: inline-block; vertical-align: middle;">Connect</button>
+						<!-- <div ng-show="selected" class="ng-binding">Selection from a modal: item1</div> -->
+					</div>
 				</div>
 
-<div ng-controller="ModalDemoCtrl" class="ng-scope">
-    <script type="text/ng-template" id="myModalContent.html">
-    	// HTML Content
-
-    </script>
-
-    <button class="btn btn-default" ng-click="open()">Open me!</button>
-    <div ng-show="selected" class="ng-binding">Selection from a modal: item1</div>
-</div>
 
 
 
@@ -98,12 +92,18 @@
 
 	</flexy-layout>
 
-    
+    <script type="text/javascript" src="/js/idbstore.js"></script>
     <script type="text/javascript" src="/js/angular-1.2.14.js"></script>
     <script type="text/javascript" src="/js/angular-animate.js"></script>
+    
+    
+    <script type="text/javascript" src="/js/ui-bootstrap-0.9.0.js"></script>    
+    <script type="text/javascript" src="/js/ui-bootstrap-tpls-0.10.0.min.js"></script>    
+    
     <script type="text/javascript" src="index.js"></script>
     <script type="text/javascript" src="/nav-tree/abn_tree_directive.js"></script>
-    <script type="text/javascript" src="/js/ui-bootstrap-0.9.0.js"></script>    	
     <script type="text/javascript" src="/js/flexy-layout.min.js"></script>
+    <script type="text/javascript" src="/controllers/connect/connect-directive.js"></script>
+
 </body>
 </html>

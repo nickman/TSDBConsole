@@ -1,5 +1,5 @@
-var tsdbConsoleApp, module;
-tsdbConsoleApp = angular.module('tsdbConsole', ['ngAnimate', 'flexyLayout']);
+var tsdbConsoleApp, appControllers;
+tsdbConsoleApp = angular.module('tsdbConsole', ['ngAnimate', 'flexyLayout','ui.bootstrap']);
 tsdbConsoleApp.controller('tsdbConsoleController', function ($scope) {
 	$scope.greeting = 'Hello';
 	$scope.person = 'World';
@@ -18,3 +18,4 @@ tsdbConsoleApp.controller('treeMenuController', function($scope) {
     $scope.example_treedata = JSON.parse(data);
   });
 });	
+
