@@ -7,14 +7,14 @@
 
         <div class="modal-body" ng-controller="connectModal">  <!-- ng-model="ConnectionModel"  -->
             <ul>
-                <li ng-repeat="knownConnection in knownConnections">
-                    <a ng-click="selected.knownConnection = knownConnection">{{ knownConnection.url }}</a>
+                <li ng-repeat="x in knownConnections">
+                    <a ng-click="f.url = knownConnection.url">{{ x.url }}</a>
                 </li>
             </ul>        
             <table><tr>            
-                <td>Server:</td><td><input type="text" ng-model="selected.knownConnection.url" class="form-control" id="selectedServer"></td> <!-- ng-model="dynamicPopover" -->
+                <td>Server:</td><td><input type="text" ng-model="f.url" class="form-control" id="selectedServer"></td> <!-- ng-model="dynamicPopover" -->
             </tr><tr style="vertical-align: middle;">
-                <td style="vertical-align: middle;">Make Default:</td><td><input ng-model="selected.knownConnection.isDefault" style="vertical-align: top;" type="checkbox" id="mkDef"></td>
+                <td style="vertical-align: middle;">Make Default:</td><td><input ng-model="f.d" style="vertical-align: top;" type="checkbox" id="mkDef"></td>
             </tr></table>            
         </div>
         <div class="modal-footer">
