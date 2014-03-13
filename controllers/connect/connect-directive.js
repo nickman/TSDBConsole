@@ -4,11 +4,75 @@
 //chrome.app.runtime.onLaunched.addListener(function(launchData) {
 console.info("Initializing Connect Modal....");
 // tsdbConsoleApp.module('connectModal',['ui.bootstrap','dialogs'])
-tsdbConsoleApp.controller('connectModal',function($scope,$rootScope,$timeout,$modal){
-  $scope.knownConnectionsX = [
-    {id: 34, url: 'ws://localhost/tsdbws', isDefault: false},
+tsdbConsoleApp.controller('MyCtrl', function($scope, Data) {
+    $scope.knownConnections = Data.get().then(function(data){
+      $scope.facilities = [];
+      for(var i = 0; i < data.length; i++) {
+          $scope.facilities.push(data[i].id);
+      }
+    });
+    //$scope.comparator = Comparators.year;
     
-  ];
+    $scope.$watch('selected', function(fac) {
+       $scope.$broadcast("rowSelected", fac);
+    });
+
+
+
+})
+  .service('Data', function() {
+
+  var dbReady = $.Deferred();
+  var dbReadyPromise = dbReady.promise();
+
+  var connectionDb = new IDBStore({
+    dbVersion: 1,
+    storeName: 'connections',
+    keyPath: 'id',
+    autoIncrement: true,
+    onStoreReady: function(){
+    
+      console.log('[T] Connection Store Ready');
+      dbReady.resolve();  
+    },
+    indexes: [
+      { name: 'url', keyPath: 'url', unique: true, multiEntry: false }
+    ]
+  }); 
+
+    this.get = function() {
+        return loadKnownConnections();
+    };
+
+
+  var loadKnownConnections = function() {
+    var d = $.Deferred();
+    dbReadyPromise.then(function() {
+      
+      console.info("[T] Fetching all known connections...")
+      var kcCount = 0;    
+      
+      connectionDb.getAll(function(data){
+        var connections = [];
+        data.forEach(function(kc){
+          kcCount++;
+          //connections.push(kc);
+        });    
+        d.resolve(connections);  
+      }, function(err) { console.error("Failed to load data", err)});      
+    });
+    return d.promise();
+  }
+
+
+  });
+
+
+tsdbConsoleApp.controller('connectModal',function($scope,$rootScope,$timeout,$modal){
+    $scope.knownConnectionsX = [
+      //{id: 34, url: 'ws://localhost/tsdbws', isDefault: false},
+    
+    ];
 
     $scope.open = function () {
       var modalInstance = null;
@@ -18,8 +82,7 @@ tsdbConsoleApp.controller('connectModal',function($scope,$rootScope,$timeout,$mo
           controller: ModalInstanceCtrl,
           resolve: {
             knownConnections: function () {
-              console.debug("RETURNING $scope.knownConnections: [%O]", $scope.knownConnections);              
-              return $scope.knownConnections;
+              return loadKnownConnections();
             }
           }
         });
@@ -56,7 +119,19 @@ tsdbConsoleApp.controller('connectModal',function($scope,$rootScope,$timeout,$mo
 
   var switchDefault = function(id) {
     console.info("Setting default connection to [%s]", id);
-    //connectionDb.
+    var onItem = function (item, cursor, transaction) {
+      item.isDefault = (item.id == id);
+      cursor.update(item);
+    };
+
+    connectionDb.iterate(onItem, {
+      index: 'url',      
+      writeAccess: true,
+      onEnd: function() {
+        console.info("Connection [%s] set to Default", id);
+      }
+    });
+    
   }
 
   var storeConnection = function(kConn) {
@@ -93,20 +168,18 @@ tsdbConsoleApp.controller('connectModal',function($scope,$rootScope,$timeout,$mo
 
   }   
 
-  var loadKnownConnections = function(cArr) {
+  var loadKnownConnections = function() {
     var d = $.Deferred();
     console.info("Fetching all known connections...")
     var kcCount = 0;    
-    console.info("KC Before: [%O]", cArr);
+    
     connectionDb.getAll(function(data){
+      var connections = [];
       data.forEach(function(kc){
         kcCount++;
-        console.info("Retrieved KC: [%O]", kc);
-        //$scope.knownConnections.push(kc);
-        cArr.push(kc);
+        connections.push(kc);
       });    
-      d.resolve($scope.knownConnections);  
-      console.info("Cached [%s] KnownConnections ---> [%O]", kcCount, cArr);
+      d.resolve(connections);  
     }, onerror);
     return d.promise();
   }
@@ -134,6 +207,7 @@ var ModalInstanceCtrl = function ($scope, $modalInstance, knownConnections) {
     $modalInstance.dismiss('cancel');
   };
 };
+
 console.info("Connect Modal Initialized");
 
 
@@ -262,27 +336,66 @@ var ModalInstanceCtrl = function ($scope, $modalInstance, items) {
 */
 
 /*
-<div ng-controller="ModalDemoCtrl">
-    <script type="text/ng-template" id="myModalContent.html">
-        <div class="modal-header">
-            <h3>I'm a modal!</h3>
-        </div>
-        <div class="modal-body">
-            <ul>
-                <li ng-repeat="item in items">
-                    <a ng-click="selected.item = item">{{ item }}</a>
-                </li>
-            </ul>
-            Selected: <b>{{ selected.item }}</b>
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-primary" ng-click="ok()">OK</button>
-            <button class="btn btn-warning" ng-click="cancel()">Cancel</button>
-        </div>
-    </script>
 
-    <button class="btn btn-default" ng-click="open()">Open me!</button>
-    <div ng-show="selected">Selection from a modal: {{ selected }}</div>
-</div>
+angular.module('todoList', [], function () {
 
+}).controller('myCtrl', function ($scope) {
+
+        $scope.todos = [
+            {
+                text: "Hello"
+            }, {
+                text: "World"
+            }
+        ]
+})
+
+
+var myApp = angular.module('myApp',['scrollable-table'])
+  .service('Data', function() {
+    this.get = function() {
+        return [{
+          facility: "Atlanta",
+          code: "C-RD34",
+          cost: 540000,
+          conditionRating: 52,
+          extent: 100,
+          planYear: 2014
+        }, {
+          facility: "Seattle",
+          code: "CRDm-4",
+          cost: 23000,
+          conditionRating: 40,
+          extent: 88,
+          planYear: 2014
+        }]
+ 
+    };
+  });
+
+// when sorting by year, sort by year and then replace %
+.service("Comparators", function() { 
+  this.year = function(r1, r2) {
+    if(r1.planYear === r2.planYear) {
+      if (r1.extent === r2.extent) return 0;
+      return r1.extent > r2.extent ? 1 : -1;
+    } else if(!r1.planYear || !r2.planYear) {
+      return !r1.planYear && !r2.planYear ? 0 : (!r1.planYear ? 1 : -1);
+    }
+    return r1.planYear > r2.planYear ? 1 : -1;
+  };
+})
+.controller('MyCtrl', function($scope, Data, Comparators) {
+    $scope.visibleProjects = Data.get();
+    $scope.comparator = Comparators.year;
+    $scope.facilities = [];
+    for(var i = 0; i < $scope.visibleProjects.length; i++) {
+        $scope.facilities.push($scope.visibleProjects[i].facility);
+    }
+    
+    $scope.$watch('selected', function(fac) {
+       $scope.$broadcast("rowSelected", fac);
+    });
+})
+;
 */

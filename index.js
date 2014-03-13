@@ -1,5 +1,5 @@
 var tsdbConsoleApp, appControllers;
-tsdbConsoleApp = angular.module('tsdbConsole', ['ngAnimate', 'flexyLayout','ui.bootstrap']);
+tsdbConsoleApp = angular.module('tsdbConsole', ['ngAnimate', 'flexyLayout','ui.bootstrap', 'scrollable-table']);
 tsdbConsoleApp.controller('tsdbConsoleController', function ($scope) {
 	$scope.greeting = 'Hello';
 	$scope.person = 'World';
