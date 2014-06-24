@@ -22,14 +22,6 @@ var dlgContent = "<div id='dialog_pickSnapshot' style='display: none;'>  \
       </fieldset> \
     </form></div>";
 */
-var dlgContent = "<div id='dialog_pickSnapshot' style='display: none;'>  \
-    <table border='1' width='100%' height='100%'><tr><th>Category</th><th>Title</th></tr> \
-    <tr><td> \
-    <input type='text' name='category' id='category' class='text ui-widget-content ui-corner-all' value='' style='width: 85%'> \
-    </td><td>  \
-    <input type='text' name='title' id='title' class='text ui-widget-content ui-corner-all' value='' style='width: 85%'></td></tr> \
-    </table></div>";
-
 
 
 
@@ -42,7 +34,6 @@ var toolDlg = '<div id="dashboardtoolbar"><ul><li><a id="nativechart-btn" style=
 document.domain = chrome.runtime.id;
 $(document).ready(function() { 
   //$('#dashboardcontainer').empty().append($('<iframe id="sandboxDashboard" src="' + chrome.runtime.getURL("/app/dashboard/sandbox-dashboard.html") + '"></iframe>')
-  
   var iframeSrc = '<iframe id="sandboxDashboard" src="' + chrome.runtime.getURL("/app/dashboard/sandbox-dashboard.html") + '" width="' + $(window).width() + '" height="' + $(window).height() + '"></iframe>';
   $('#dashboardcontainer').empty().height($(window).height).width($(window).width).append(iframeSrc);
   contentWindow = $('#sandboxDashboard')[0].contentWindow;
@@ -67,44 +58,63 @@ $(document).ready(function() {
 
 function makeDialog() {
   if(dlg==null) {
-    dlg = $(dlgContent).dialog({
-      title: dlgTitle,
-      autoOpen: false,
-      closeOnEscape: true,
-      modal: true,
-      width: 'auto',
-      height: 'auto',
-      position: ['center', 'center'],
-      create: function(event, ui) {
-        var cIndex = jQuery.combobox.instances==null ? 0 : jQuery.combobox.instances.length;
-        $('#title').width(400).combobox([]);
-        $('#category').width(400).combobox([]);
-        $('#category').on("change", function(evt) {          
-          var cat = $('#category').val();
-          console.info("CAT SELECT: [%s] evt: [%O]", cat, evt);
-          if(cat!=null && cat.length > 0) {
-            popTitles(cat);
-          }
-        });
-        comboTitles = jQuery.combobox.instances[cIndex];
-        comboCategories = jQuery.combobox.instances[cIndex+1];
-        $('#dialog_pickSnapshot a.combobox_button').css('height', '20').css('width', '20');
-      },
-      open:  function(event, ui) {
-        clearBoth();
-        popDirectories();
-      },
-      buttons: {
-        Go : function() {
-          $('#dialog_saveSnapshotErr').remove();
-          addNativeChart($('#category').val(), $('#title').val());
-          $( this ).dialog( "close" );
+    dlg = "";
+    $.get("/app/dashboard/pickSnapshotDialog.html", function(dlgContent){
+      // dialog_pickSnapshot
+      
+      dlg = $(dlgContent).filter("#dialog_pickSnapshot").dialog({
+        title: dlgTitle,
+        autoOpen: false,
+        closeOnEscape: true,
+        modal: true,
+        width: $(window).width()/2,
+        height: 'auto',
+        position: ['center', 'center'],
+        create: function(event, ui) {
+          dbList({db: "OpenTSDB2", ostore: "directories"}).then(function(cats){
+            $.each(cats, function(index, cat) {
+              var itemval= '<option value="' + cat.name + '">' + cat.name + '</option>';
+              $("#psCatList").append(itemval);
+            });
+          });
+          $("#psCatList").on( "select", function(){
+            var selectedCat = $("#psCatList option:selected").text();
+            if(selectedCat==null || selectedCat=="") return;
+            $("#psTitleList").empty();
+            var filter = function(item) {
+              return (item.category==selectedCat);
+            }
+            dbList({db: "OpenTSDB2", ostore: "snapshots", comp: filter}).then(function(shots){
+              $.each(shots, function(index, shot) {
+                var itemval= '<option value="' + cat.category + '">' + cat.category + '</option>';
+                $("#psTitleList").append(itemval);
+              });
+            });
+
+          });
         },
-        Cancel: function() {
+        open:  function(event, ui) {
+          //clearBoth();
+          //popDirectories();
+          $("#psCatList").width("90%");
+          $("#psTitleList").width("90%");
+          $("#psCatFilter").width("90%");
+          $("#psTitleFilter").width("90%");
+
+        },
+        buttons: {
+          Go : function() {
             $('#dialog_saveSnapshotErr').remove();
+            addNativeChart($('#category').val(), $('#title').val());
             $( this ).dialog( "close" );
-        }
-      }      
+          },
+          Cancel: function() {
+              $('#dialog_saveSnapshotErr').remove();
+              $( this ).dialog( "close" );
+          }
+        }      
+      });
+
     });
   }
 }

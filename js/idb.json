@@ -1,21 +1,21 @@
 {
-	"dbname": "OpenTSDB2",
+	"dbname": "OpenTSDB",
 	"version" : 2,
 	"objectStores" : {
-		"categories" : {
+		"directories" : {
 			"versions" : {
 				"2" : {
 					"keyPath" : "id",
 					"autoIncrement" : true,
 			      	"indexes" : {
-			      		"fullKeyIndex" : {
-			      		"field" : "name",
-			      		"unique" : true
-			      	}		      	
-			      },
-					"data" : [
-						"Default"
-					]
+			      		"nameIndex" : {
+			      			"field" : "name",
+			      			"unique" : true
+			      		}		      	
+			    	},
+			    	"data" : [
+			    		{"name" : "Default"},
+			    	]
 				}
 			}
 		},
@@ -37,7 +37,6 @@
 			      			"field" : "title",
 			      			"unique" : false
 			      		}			      	
-
 			      	}					
 				}
 			}

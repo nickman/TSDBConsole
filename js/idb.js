@@ -1,6 +1,7 @@
-document.domain = chrome.runtime.id;
+
 
 var xschema = null;
+var executableSchema = null;
 
 function getDbConfig() {
   var d = $.Deferred();
@@ -23,8 +24,15 @@ function getDbConfig() {
   return promise;
 }
 
+function deleteDatabase(name) {
+  var dbRequest = window.indexedDB.deleteDatabase(name);
+  dbRequest.onsuccess = function(evt){ console.info("Database [" + name + "] deleted.") }
+  dbRequest.onerror = function(evt){ console.error("Failed to delete Database [" + name + "]: --> Error:[%O]", evt)}
+}
+
 function objectStoreFx(name, keyPath, autoIncrement) {
-  return function(tx) {
+  return function _storefx_(tx) {
+    var fxName = "ObjectStoreFunction" + ([name, keyPath, autoIncrement].join("/"));
     console.info("======== Creating ObjectStore [%s], kp: [%s], autoIncr: [%s] ========", name, keyPath, autoIncrement);
     objectStoreInstance = tx.createObjectStore(name, {
       keyPath: keyPath,
@@ -33,10 +41,23 @@ function objectStoreFx(name, keyPath, autoIncrement) {
   }
 }
 
-function indexFx(name, keyPath, autoIncrement) {
-  return function(tx) {
-    console.info("======== Creating ObjectStore [%s], kp: [%s], autoIncr: [%s] ========", name, keyPath, autoIncrement);
-    tx.objectStore(osName).createIndex(indexName, indexCfg.field, indexCfg.unique); 
+function indexFx(objectStore, indexName, field, unique) {
+  return function _indexfx_(tx) {
+    var fxName = "IndexFunction" + ([objectStore, indexName, field, unique].join("/"));
+    console.info("======== Creating Index [%s] on store [%s], field: [%s], unique: [%s] ========", indexName, objectStore, field, unique);
+    tx.objectStore(objectStore).createIndex(indexName, field, unique); 
+  }
+}
+
+function dataFx(objectStore, data) {    
+  return function _datafx_(tx) {
+    var fxName = "DataFunction" + ([objectStore, JSON.stringify(data)].join("/"));
+    for(index in data) {
+      if(data[index]!=null) {        
+        tx.objectStore(objectStore).add(data[index]);
+        console.info("Added data to store [%s] --> [%O]", objectStore, data[index]);
+      }
+    }
   }
 }
 
@@ -45,47 +66,65 @@ function prepareSchema(config) {
   var schema = {};
   var createdObjectStores = [];
   for(var i = 1; i <= config.version; i++) {
-    schema[("" + i)] = [];
+    schema[i] = [];
   }
-  for(os in config.objectStores) {
+  for(os in config.objectStores) {    
     var osName = os;
     var osCfg = config.objectStores[os];
     for(v in osCfg.versions) {
       var version = v;
       var cfg = osCfg.versions[v];      
       if(cfg.keyPath) {        
-        schema[("" + version)].push(objectStoreFx(osName, cfg.keyPath, cfg.autoIncrement));
-        console.info("======== Defining ObjectStore: Cmd: [%s],  Store: [%s], kp: [%s], autoIncr: [%s] ========", schema[("" + version)].length, osName, cfg.keyPath, cfg.autoIncrement);
+        schema[version].push(objectStoreFx(osName, cfg.keyPath, cfg.autoIncrement));        
       }
       if(cfg.indexes) {
         for(ind in cfg.indexes) {
           var indexName = ind;
           var indexCfg = cfg.indexes[ind];
-          schema[("" + version)].push(function(tx){
-            tx.objectStore(osName).createIndex(indexName, indexCfg.field, indexCfg.unique); 
-          });
+          schema[version].push(indexFx(osName, indexName, indexCfg.field, indexCfg.unique));
         }
       }
-    }
-    for(f in schema[("" + i)]) {
-      console.info(schema[("" + i)][f]);
-    }
+      if(cfg.data!=null) {        
+          console.info("[Data] for [%s], Items: [%s]", osName, cfg.data.length);
+          schema[version].push(dataFx(osName, cfg.data));
+      }
+    }    
   }
-  console.dir(schema);
   xschema = schema;
   return schema;
+}
+
+function isPromise(value) {
+    if(value==null) return false;
+    if (typeof value.then !== "function") {
+        return false;
+    }
+    var promiseThenSrc = String($.Deferred().then);
+    var valueThenSrc = String(value.then);
+    return promiseThenSrc === valueThenSrc;
 }
 
 function executeSchema(config) {
   var schema = prepareSchema(config);
   var execSchema = {};
-  for(v in schema) {
-    execSchema[("" + v)] = function(tx) {
-      for(f in schema[v]) {
-        schema[v][f](tx);
+  var maxVersion = config.version;
+  for(var version = 1; version <= maxVersion; version++) {
+    console.info("Staging [%s] functions for Version [%s]", schema[version].length, version);
+    var vx = version;
+    var schv = schema[version];
+    execSchema[version] = schema[version].length==0 ? function(tx){} : function(tx){          
+      var r = null;
+      for(f in schv) {
+        var fx = schv[f];        
+        if(isPromise(r)) {
+          r.then(fx(tx));
+        } else {
+          r = fx(tx);          
+        }        
       }
     }
   }
+  executableSchema = execSchema;
   return execSchema;
 }
 
@@ -98,7 +137,7 @@ function initDb() {
       $.indexedDB(config.dbname, {
         "version" : config.version,
         "upgrade" : function(transaction){
-          console.info("DB UPGRADE");
+          console.info("DB UPGRADE: [%O]", arguments);
         },        
         "schema" : schema
       });
@@ -123,109 +162,98 @@ function initDb() {
   return promise;
 }
 
-/*
-  return $.indexedDB("OpenTSDB", { 
-      // The second parameter is optional
-      "version" : 2,  // Integer version that the DB should be opened with
-      "upgrade" : function(transaction){
-        console.info("DB UPGRADE");
-      },
-      "schema" : {
-          "1" : function(transaction){
-              console.info("VERSION 1");
-              initDirectoriesOS(transaction).always(initSnapshotsOS(transaction)).always(initDashboardOS(transaction)).then(
-                function() {
-                  console.info("================ DB Init Complete ================");
-                  d.resolve();
-                },
-                function(error, event) {
-                  console.error("================ DB Init Complete ================: %O", event);
-                  d.reject(event);
-                }
-              );
-          },
-          "2" : function(transaction){
-              console.info("VERSION 2");
-              d.resolve();
+
+function doInitDb() {
+  initDb().then(
+    function() {
+      console.info("DB Init Complete");
+    }
+  );
+}
+
+// var dbhandler = function(items) { $.each(items, function(index, item) { console.info("Item: [%s]", item.name); }); };
+// list({db: "OpenTSDB", ostore: "categories", index: "nameIndex"}).then(dbhandler)
+// // var gFilter = function(item) { return item.indexOf("groovy")!=-1; }
+// 
+
+function listTest(match) {
+  var dbhandler = function(items) { $.each(items, function(index, item) { console.info("Item: [%s]", item.name); }); };
+  var gFilter = function(item) { if(item.name==null) return false; return item.name.indexOf(match)!=-1; }
+  dbList({db: "OpenTSDB", ostore: "categories", comp: gFilter}).then(dbhandler);
+}
+
+function listKeyTest(match) {
+  var dbhandler = function(items) { $.each(items, function(index, item) { console.info("Item: [%s]", item.name); }); };
+  var gFilter = function(item) { if(item.name==null) return false; return item.name.indexOf(match)!=-1; }
+  dbList({db: "OpenTSDB", ostore: "categories", comp: gFilter}, match).then(dbhandler);
+}
+
+
+
+function dbList(query, keys) {
+  // db, ostore, comp, index,  keys
+  var values = [];
+  var d = $.Deferred();
+  var promise = d.promise(); 
+  var index = query.index;
+  var append = function(item) {
+      if(query.comp!=null) {
+        try {
+          if(query.comp(item.value)) {
+            values.push(item.value);  
           }
+        } catch (e) {}
+      } else {
+        values.push(item.value);
+      }    
+  }
+  var iterationPromise = null;
+  try {
+    if(query.index!=null) {
+      // THIS IS BROKEN
+      iterationPromise = $.indexedDB(query.db)
+        .objectStore(query.ostore)
+          .index(query.index)
+            .each(append); 
+    } else {
+      iterationPromise = $.indexedDB(query.db)
+        .objectStore(query.ostore)
+          .each(append); 
+    }
+    iterationPromise.done(function(result, event){
+      if(result==null) {
+        d.resolve(values);
       }
+    });
+    
+    iterationPromise.fail(function(error, event){
+      console.error("DB Lookup Failure. error: [%O], event: [%O]", error, event!=null ? event.stack : null);
+      d.reject(error, event);
+    });
+  } catch(e) {
+    d.reject(e);
+  }
+  return promise;
+}
+
+
+
+function popDirectories() {
+  var dirs = [];
+  var iterationPromise  = $.indexedDB("OpenTSDB").objectStore("directories").each(function(item){
+    dirs.push(item.value.name);
   });
-  return promise;
+  iterationPromise.done(function(result, event){
+    if(result==null) {
+      console.info("Retrieved Directories: [%O]", dirs);
+      comboCategories.setSelectOptions(dirs);
+      if(dirs.length>0) {
+        $('#category').val(dirs[0]);
+        popTitles(dirs[0]);
+      }
+    }
+  }); 
 }
-*/
-
-function initDirectoriesOS(tx) {
-  console.info("Creating Snapshot ObjectStore")
-  var d = $.Deferred();
-  var promise = d.promise();
-
-  var directoryObjectStore = tx.createObjectStore("directories", {
-      "keyPath" : 'name' 
-  });    
-  var request = directoryObjectStore.add({name: "Default"});
-  
-  request.done = function(event){ 
-    console.info("----> Inited directories and added Default");
-    promise.resolve();
-  };
-  request.fail = function(e){
-    console.error("Data save failed");
-    console.error(e);
-    tx.abort();
-    promise.reject(e);
-  };
-  return promise;
-}
-
-// http://james.padolsey.com/javascript/parsing-urls-with-the-dom/
-
-function initSnapshotsOS(tx) {  
-  var d = $.Deferred();
-  var p = d.promise();
-  try {
-    var req = tx.createObjectStore("snapshots", {
-      "keyPath" : 'id' ,
-      "autoIncrement" : true
-
-    }).createIndex("fullKeyIndex", "fullKey", true);   
-    req.done(function(){
-      console.info("----> Inited snapshots")
-      d.resolve();
-    });
-  } catch (e) {
-    d.reject(e);
-  }
-  return p;
-}
-
-function initDashboardOS(tx) {  
-  var d = $.Deferred();
-  var p = d.promise();
-  try {
-    var req = tx.createObjectStore("dashboards", {
-      "keyPath" : 'id' ,
-      "autoIncrement" : true
-
-    }).createIndex("dashboardNameIndex", "dashboardName", true);   
-    req.done(function(){
-      console.info("----> Inited dashboards")
-      d.resolve();
-    });
-  } catch (e) {
-    d.reject(e);
-  }
-  return p;
-}
-
-
-
-  function deleteDb(dbname) {
-    var dbRequest = window.indexedDB.deleteDatabase(dbname);
-    dbRequest.onsuccess = function(evt){ console.info("Deleted DB:%o", evt); }
-    dbRequest.onerror = function(evt){ console.error("Failed to delete db: %o", evt.target.error); }  
-  }
-
-
 
 
 
@@ -358,49 +386,6 @@ function doPersistSnapshot(category, title, snapshot) {
   return promise;
 }
 
-/*
-
-
-
-  <div id="dialog_saveSnapshot" title="OpenTSDB Console: Save Chart Snapshot" >  
-    <form>
-      <fieldset>
-        <label for="category">Category:</label>
-        <input type="text" name="category" id="category" class="text ui-widget-content ui-corner-all" value="" style="width: 65%">
-        <label for="snapshot">Snapshot:</label>
-        <input type="text" name="snapshot" id="snapshot" class="text ui-widget-content ui-corner-all" value="" style="width: 95%">
-      </fieldset>
-    </form>  
-      <div id="tabs" >
-        <ul>
-            <li><a id="savesnapshot-btn">Save</a></li>
-            <li><a id="cancelsnapshot-btn">Cancel</a></li>
-        </ul>
-        </div>    
-  </div>
-
-
-
-
-function onWebViewLoaded() {
-  console.dir(arguments);
-}
-
-function loadWebView(url) {
-  var fqUrl = "/app/nativetsd/tsdwindow.html";
-  console.info("Loading OpenTSDB Native Console at [%s] in window [%s]", url, fqUrl);
-  chrome.app.window.create(fqUrl, {
-  'id' : 'tsdWindow',
-  'state' : 'normal',
-    'bounds' : {
-      'width': Math.round(window.screen.availWidth*0.8),
-      'height': Math.round(window.screen.availHeight*0.8),
-      'left' : Math.round((window.screen.availWidth-(window.screen.availWidth*0.8))/2),
-      'top' : Math.round((window.screen.availHeight-(window.screen.availHeight*0.8))/2)
-    }
-  });
-}
-*/
 
 // This function creates a new anchor element and uses location
 // properties (inherent) to get the desired URL data. Some String
@@ -434,3 +419,4 @@ function parseURL(url) {
     };
 }
 
+initDb();

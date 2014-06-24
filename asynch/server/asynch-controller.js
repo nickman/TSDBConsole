@@ -107,7 +107,7 @@ function onImageRequest(msg, port) {
     		if("OK"==xhr.statusText) {
 		    	var b = data.currentTarget.response;
 		        console.info("Blob Retrieved: [" +  b + "]");
-		        port.postMessage({type: "img", ts: data.timeStamp, seq: msg.seq, response: {blob: b}});
+		        port.postMessage({type: "img", ts: data.timeStamp, seq: msg.seq, response: {blob: window.URL.createObjectURL(b)}});
     		} else {
 		    	console.error("Failed to get image [" + url + "] : [" + xhr.statusText + "]"); 
 		    	port.postMessage({type: "err-img", seq: msg.seq, error: xhr.statusText});

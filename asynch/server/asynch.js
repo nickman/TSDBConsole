@@ -69,7 +69,7 @@ function onImageRequest(event) {
         	event.data.callback(b);
         	return;
         }
-        event.source.postMessage({type: "img", seq: event.data.seq, response: {blob: b}}, event.origin);
+        event.source.postMessage({type: "img", seq: event.data.seq, response: {blob: window.URL.createObjectURL(b)}}, event.origin);
     },
     xhr.open('GET', url, true);
     xhr.responseType = "blob";
