@@ -1,0 +1,70 @@
+{
+	"dbname": "OpenTSDB2",
+	"version" : 2,
+	"objectStores" : {
+		"categories" : {
+			"versions" : {
+				"2" : {
+					"keyPath" : "id",
+					"autoIncrement" : true,
+			      	"indexes" : {
+			      		"fullKeyIndex" : {
+			      		"field" : "name",
+			      		"unique" : true
+			      	}		      	
+			      },
+					"data" : [
+						"Default"
+					]
+				}
+			}
+		},
+		"snapshots" : {
+			"versions" : {
+				"2" : {
+			      	"keyPath" : "id" ,
+			      	"autoIncrement" : true,
+			      	"indexes" : {
+			      		"fullKeyIndex" : {
+			      			"field" : "fullKey",
+			      			"unique" : true
+			      		},
+			      		"categoryIndex" : {
+			      			"field" : "category",
+			      			"unique" : false
+			      		},
+			      		"titleIndex" : {
+			      			"field" : "title",
+			      			"unique" : false
+			      		}			      	
+
+			      	}					
+				}
+			}
+		},
+		"dashboards" : {
+			"versions" : {
+				"2" : {
+			      	"keyPath" : "id" ,
+			      	"autoIncrement" : true,
+			      	"indexes" : {
+			      		"fullKeyIndex" : {
+			      			"field" : "fullKey",
+			      			"unique" : true
+			      		},
+			      		"categoryIndex" : {
+			      			"field" : "categoryId",
+			      			"unique" : false
+			      		},
+			      		"nameIndex" : {
+			      			"field" : "name",
+			      			"unique" : false
+			      		}			      	
+			      	}					
+
+				}
+			}
+		}
+	}
+    
+}

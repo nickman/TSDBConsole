@@ -24,6 +24,10 @@ function route(e) {
 		case "img":
 			onImageRequest(e);
 			break;
+		case "eval":
+			onEvalRequest(e);
+			break;
+
 		default:
 			unhandled(e, "Unrecognized Type [" + e.data + "]");
 	}
@@ -37,6 +41,11 @@ function unhandled(event, message) {
 	console.error("Unhandled Event: " + message)
 }
 
+
+function onEvalRequest(event) {
+	var result = eval(event.data.src);
+	event.source.postMessage({type: "eval", seq: event.data.seq, response: result}, event.origin);
+}
 
 /**
 	Requests an external URL as a blob.

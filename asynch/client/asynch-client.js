@@ -31,6 +31,10 @@ function loadExternalBlob(urlToLoad) {
 	return postRequest({type: "img", url: urlToLoad});
 }
 
+function requestEval(expression) {
+	return postRequest({type: "eval", src: expression});	
+}
+
 
 function postRequest(request) {
 	var d = $.Deferred();

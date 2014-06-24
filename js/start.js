@@ -53,10 +53,6 @@ function loadWebView(appName) {
 function initialize() {
   $('body').layout({ applyDemoStyles: true, showErrorMessages: false, showDebugMessages: false, noAlert: true });
   // ====================================
-  //	Open DB
-  // ====================================
-  opendb();
-  // ====================================
   //	Buttons
   // ====================================
   //$('#nativetsd-btn').button({icons: {primary: 'ui-icon-tsd'}}).css({ width: '100%'})
