@@ -14,7 +14,7 @@
 			      		}		      	
 			    	},
 			    	"data" : [
-			    		{"name" : "Default"},
+			    		{"name" : "Default"}
 			    	]
 				}
 			}
@@ -60,10 +60,8 @@
 			      			"unique" : false
 			      		}			      	
 			      	}					
-
 				}
 			}
 		}
-	}
-    
+	}    
 }

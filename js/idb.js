@@ -2,12 +2,19 @@
 
 var xschema = null;
 var executableSchema = null;
+var initialized = false;
 
-function getDbConfig() {
+$(document).ready(function() { 
+    console.info("Initializing DB....");
+    initDb();
+    console.info("Initialized DB");
+});
+
+function getJSON(url) {
   var d = $.Deferred();
   var promise = d.promise();
 
-  var uri = "/js/idb.json";
+  var uri = url;
   var xhr = new XMLHttpRequest();
   xhr.onerror = function(err) { 
     console.error("Failed to get dbConfig from [" + uri + "]"); 
@@ -15,11 +22,9 @@ function getDbConfig() {
   },
   xhr.onload = function(data) { 
     var b = data.currentTarget.response;
-    console.info("JSON Retrieved: [%O]", b);
     d.resolve(b);
   },
   xhr.open('GET', uri, true);
-  xhr.responseType = "json";
   xhr.send();
   return promise;
 }
@@ -129,11 +134,12 @@ function executeSchema(config) {
 }
 
 function initDb() {
+  if(initialized) return;
   var d = $.Deferred();
   var promise = d.promise(); 
   try {
-    var p = getDbConfig().then(function(config){
-      var schema = executeSchema(config);
+    var p = getJSON("/js/idb.json").then(function(config){
+      var schema = executeSchema(JSON.parse(config));
       $.indexedDB(config.dbname, {
         "version" : config.version,
         "upgrade" : function(transaction){
@@ -142,6 +148,7 @@ function initDb() {
         "schema" : schema
       });
       d.resolve();
+      initialized = true;
     });
     p.then(
       function() { 
@@ -236,25 +243,28 @@ function dbList(query, keys) {
   return promise;
 }
 
-
-
-function popDirectories() {
-  var dirs = [];
-  var iterationPromise  = $.indexedDB("OpenTSDB").objectStore("directories").each(function(item){
-    dirs.push(item.value.name);
-  });
-  iterationPromise.done(function(result, event){
-    if(result==null) {
-      console.info("Retrieved Directories: [%O]", dirs);
-      comboCategories.setSelectOptions(dirs);
-      if(dirs.length>0) {
-        $('#category').val(dirs[0]);
-        popTitles(dirs[0]);
-      }
+function executeJson(url) {
+  getJSON("/js/test-data.json").then(function(text){
+    var commands = JSON.parse(text);
+    for(index in commands) {
+      var cmd = comands[index];
+      var objectStore = $.indexedDB(cmd.database).objectStore(cmd.objectstore);
+      
     }
-  }); 
+  });
 }
 
+/*
+[
+  {
+    "database" : "OpenTSDB",
+    "objectstore" : "directories",
+    "command" : "insert",
+    "data" : [
+        {"name" : "java.runtime.name"},
+        {"name" : "sun.boot.library.path"},
+
+*/
 
 
 function saveSnapshot(tsdurl) {
@@ -419,4 +429,3 @@ function parseURL(url) {
     };
 }
 
-initDb();

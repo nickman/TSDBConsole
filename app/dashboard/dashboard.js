@@ -71,7 +71,7 @@ function makeDialog() {
         height: 'auto',
         position: ['center', 'center'],
         create: function(event, ui) {
-          dbList({db: "OpenTSDB2", ostore: "directories"}).then(function(cats){
+          dbList({db: "OpenTSDB", ostore: "directories"}).then(function(cats){
             $.each(cats, function(index, cat) {
               var itemval= '<option value="' + cat.name + '">' + cat.name + '</option>';
               $("#psCatList").append(itemval);
@@ -84,7 +84,7 @@ function makeDialog() {
             var filter = function(item) {
               return (item.category==selectedCat);
             }
-            dbList({db: "OpenTSDB2", ostore: "snapshots", comp: filter}).then(function(shots){
+            dbList({db: "OpenTSDB", ostore: "snapshots", comp: filter}).then(function(shots){
               $.each(shots, function(index, shot) {
                 var itemval= '<option value="' + cat.category + '">' + cat.category + '</option>';
                 $("#psTitleList").append(itemval);
