@@ -37,32 +37,47 @@ function deleteDatabase(name) {
 
 function objectStoreFx(name, keyPath, autoIncrement) {
   return function _storefx_(tx) {
-    var fxName = "ObjectStoreFunction" + ([name, keyPath, autoIncrement].join("/"));
+    var fxName = "ObjectStoreFunction:" + ([name, keyPath, autoIncrement].join("/"));
     console.info("======== Creating ObjectStore [%s], kp: [%s], autoIncr: [%s] ========", name, keyPath, autoIncrement);
-    objectStoreInstance = tx.createObjectStore(name, {
+    return objectStoreInstance = tx.createObjectStore(name, {
       keyPath: keyPath,
       autoIncrement: autoIncrement
     });
+
   }
 }
 
 function indexFx(objectStore, indexName, field, unique) {
   return function _indexfx_(tx) {
-    var fxName = "IndexFunction" + ([objectStore, indexName, field, unique].join("/"));
+    var fxName = "IndexFunction:" + ([objectStore, indexName, field, unique].join("/"));
     console.info("======== Creating Index [%s] on store [%s], field: [%s], unique: [%s] ========", indexName, objectStore, field, unique);
-    tx.objectStore(objectStore).createIndex(indexName, field, unique); 
+    var pr = tx.objectStore(objectStore).createIndex(field, {"unique" : unique, "multiEntry" : false}, indexName); 
+    console.info("IndexFX [%O]", pr);
+    /*
+    pr.then(function(){
+      console.info("Completed [%s]", fxName);
+    });
+    */
+    return pr;
   }
 }
 
 function dataFx(objectStore, data) {    
   return function _datafx_(tx) {
-    var fxName = "DataFunction" + ([objectStore, JSON.stringify(data)].join("/"));
+    
+
+    var promise = null;
     for(index in data) {
       if(data[index]!=null) {        
-        tx.objectStore(objectStore).add(data[index]);
-        console.info("Added data to store [%s] --> [%O]", objectStore, data[index]);
+        if(promise==null) {
+          promise = tx.objectStore(objectStore).add(data[index]);
+        } else {
+          promise.then(tx.objectStore(objectStore).add(data[index]));
+        }
+        console.info("Added data to store [%s] --> [%s]", objectStore, JSON.stringify(data[index]));
       }
     }
+    return promise;
   }
 }
 
@@ -89,9 +104,9 @@ function prepareSchema(config) {
           schema[version].push(indexFx(osName, indexName, indexCfg.field, indexCfg.unique));
         }
       }
-      if(cfg.data!=null) {        
-          console.info("[Data] for [%s], Items: [%s]", osName, cfg.data.length);
-          schema[version].push(dataFx(osName, cfg.data));
+      if(cfg.commands!=null) {                
+          console.info("[Data] for [%s], Items: [%s]", osName, cfg.commands.length);
+          schema[version].push(dataFx(osName, cfg.commands));
       }
     }    
   }
@@ -125,8 +140,9 @@ function executeSchema(config) {
           r.then(fx(tx));
         } else {
           r = fx(tx);          
-        }        
+        }      
       }
+      return r;
     }
   }
   executableSchema = execSchema;
@@ -138,17 +154,28 @@ function initDb() {
   var d = $.Deferred();
   var promise = d.promise(); 
   try {
-    var p = getJSON("/js/idb.json").then(function(config){
-      var schema = executeSchema(JSON.parse(config));
-      $.indexedDB(config.dbname, {
+    var p = getJSON("/js/idb.json").then(function(result){
+      var config = JSON.parse(result);
+      var schema = executeSchema(config);
+      var openPromise = $.indexedDB(config.dbname, {
         "version" : config.version,
         "upgrade" : function(transaction){
-          console.info("DB UPGRADE: [%O]", arguments);
-        },        
-        "schema" : schema
+          console.info("DB UPGRADE: [%O]", arguments);          
+        }        
+        ,"schema" : schema
       });
-      d.resolve();
-      initialized = true;
+      openPromise.done(function(){
+        console.info("DB Open/Upgade Complete: [%O]", arguments);
+        d.resolve();
+        initialized = true;
+      });
+      openPromise.progress(function(){
+        console.info("DB Upgrade In Process: [%O]", arguments);
+      });
+      openPromise.fail(function(){
+        console.error("DB Upgrade Failed: [%O]", arguments);
+      });
+
     });
     p.then(
       function() { 
@@ -178,10 +205,35 @@ function doInitDb() {
   );
 }
 
+function listIndexes(dbn) {
+  var op = window.indexedDB.open(dbn);
+  var db = null;
+  var tx = null;
+  op.onsuccess = function(event) {
+    try {
+      db = event.target.result;
+      console.info("DB: %O", db);
+      //for(var x = 0, y = db.objectStoreNames.length; x < y; x++) {
+      $.each(db.objectStoreNames, function(t, osn) {        
+        tx = db.transaction(osn, "readwrite");
+        var store = tx.objectStore(osn);
+        console.info("Store: %O", store);
+        console.group("[DBXInterface] Index Names on DB [%s], ObjectStore [%s], Indexes: [%s]", db.name, store.name, JSON.stringify(store.indexNames));
+        for(var x = 0, y = store.indexNames.length; x < y; x++) {
+          console.info(store.indexNames[x]);
+        }
+        console.groupEnd();      
+      });
+    } finally {
+      if(db!=null) try { db.close(); } catch(e) {}
+    }
+  }
+}
+
 // var dbhandler = function(items) { $.each(items, function(index, item) { console.info("Item: [%s]", item.name); }); };
 // list({db: "OpenTSDB", ostore: "categories", index: "nameIndex"}).then(dbhandler)
 // // var gFilter = function(item) { return item.indexOf("groovy")!=-1; }
-// 
+
 
 function listTest(match) {
   var dbhandler = function(items) { $.each(items, function(index, item) { console.info("Item: [%s]", item.name); }); };
@@ -243,26 +295,166 @@ function dbList(query, keys) {
   return promise;
 }
 
-function executeJson(url) {
-  getJSON("/js/test-data.json").then(function(text){
-    var commands = JSON.parse(text);
-    for(index in commands) {
-      var cmd = comands[index];
-      var objectStore = $.indexedDB(cmd.database).objectStore(cmd.objectstore);
-      
+
+// "/js/test-data.json"
+// executeJson("/js/test-data.json").then(function(x) { console.info("Complete: [%O]", x); });
+
+function executeJson(src, target) {
+  if(src==null) return;
+  var url = null;
+  if($.isPlainObject(src)) {
+    url = window.URL.createObjectURL(new Blob([JSON.stringify(src)], {type: 'text/json'}));
+  } else {
+    url = src;
+  }
+  var promises = [];
+  getJSON(url).then(function(result){
+    try { window.URL.revokeObjectURL(url); } catch (e) {}
+    var dbName = null;
+    var osName = null;
+    var isArr = $.isArray(result);
+    var cmds = JSON.parse(isArr ? result[0] : result);
+    // cmds could be an array
+    var cmdArray = null;
+    if($.isArray(cmds)) {
+      cmdArray = cmds;
+    } else {
+      cmdArray = [cmds];
     }
+    console.info("Processing [%s] JSON DB Commands", cmdArray.length);
+    $.each(cmdArray, function(idx, cmd){
+      if(cmd.database==null) {
+        if(target==null || target.database==null || target.objectstore==null || ) throw "JSON did not contain 'database' and/or 'objectstore' and none supplied in target";
+        dbName = target.database;
+        osName = target.objectstore;
+      } else {
+        dbName = cmd.database;
+        osName = cmd.objectstore;
+      }
+      promises.push(executeParsedCommands(dbName, osName, cmd));
+    });
   });
+  return $.when(promises);
 }
 
+function executeParsedCommands(dbName, osName, commands) {
+  var transactionPromise = $.indexedDB(dbName).transaction(osName);  
+  transactionPromise.done(function(event){
+    console.info("Commands TX Complete: [%O]", event);
+  });
+
+  var promises = [transactionPromise];
+  transactionPromise.progress(function(tx){
+    var objectStore = tx.objectStore(osName);
+    $.each(commands.commands, function(idx, cmd){
+        switch(cmd.command) {
+          case "insert":
+            console.group("Processing [%s] inserts against [%s/%s]", cmd.data.length, dbName, osName);
+            $.each(cmd.data, function(idx, data) {
+              //console.info("Adding [%s]", JSON.stringify(data));
+              promises.push(objectStore.add(data));
+            }); 
+            console.info("Inserts complete [%s/%s/%s]", cmd.data.length, dbName, osName);
+            console.groupEnd();
+            break;
+          case "delete":
+            console.info("Processing [%s] deletes against [%s/%s]", cmd.data.length, dbName, osName);
+            $.each(cmd.data, function(idx, data) {
+              promises.delete(objectStore.add(data));
+            });            
+            break;
+          case "update":
+            throw "Update not supported yet";
+            break;
+          default:
+            console.warn("Unrecognized Command [%s]", cmd.command);
+        }
+    });      
+  });
+  return $.when(promises);
+}
+
+
 /*
+function executeParsedCommands(dbName, osName, commands) {
+  var transactionPromise = $.indexedDB(dbName).transaction(osName);  
+  transactionPromise.done(function(event){
+    console.info("Commands TX Complete: [%O]", event);
+  });
+
+  var promises = [transactionPromise];
+  transactionPromise.progress(function(tx){
+    var objectStore = tx.objectStore("objectStoreName");
+    $.each(commands.commands, function(idx, cmd){
+        switch(cmd.command) {
+          case "insert":
+            console.info("Processing [%s] inserts against [%s/%s]", cmd.data.length, dbName, osName);
+            $.each(cmd.data, function(idx, data) {
+              promises.add(objectStore.add(data));
+            }); 
+            console.info("Inserts complete [%s/%s/%s]", cmd.data.length, dbName, osName);
+            break;
+          case "delete":
+            console.info("Processing [%s] deletes against [%s/%s]", cmd.data.length, dbName, osName);
+            $.each(cmd.data, function(idx, data) {
+              promises.delete(objectStore.add(data));
+            });            
+            break;
+          case "update":
+            throw "Update not supported yet";
+            break;
+          default:
+            console.warn("Unrecognized Command [%s]", cmd.command);
+        }
+    });      
+  });
+  return $.when(promises);
+}
+
+ */
+
+
+/*
+
+{
+  "dbname": "OpenTSDB",
+  "version" : 1,
+  "objectStores" : {
+    "directories" : {
+      "versions" : {
+        "1" : {
+          "keyPath" : "id",
+          "autoIncrement" : true,
+              "indexes" : {
+                "nameIndex" : {
+                  "field" : "name",
+                  "unique" : true
+                }           
+            },
+            "commands" : [
+              {
+                "command" : "insert",
+                "data" : [
+                  {"name" : "Default"}
+                ]
+              }
+            ]
+
 [
   {
     "database" : "OpenTSDB",
     "objectstore" : "directories",
-    "command" : "insert",
-    "data" : [
-        {"name" : "java.runtime.name"},
-        {"name" : "sun.boot.library.path"},
+    "commands" : [
+      {
+        "command" : "insert",
+        "data" : [
+            {"name" : "java.runtime.name"},
+            {"name" : "sun.boot.library.path"},
+            {"name" : "java.vm.version"},
+            {"name" : "java.vm.vendor"},
+            {"name" : "java.vendor.url"},
+            {"name" : "path.separator"},
+
 
 */
 

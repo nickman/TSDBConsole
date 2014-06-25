@@ -13,8 +13,13 @@
 			      			"unique" : true
 			      		}		      	
 			    	},
-			    	"data" : [
-			    		{"name" : "Default"}
+			    	"commands" : [
+			    		{
+				    		"command" : "insert",
+					    	"data" : [
+					    		{"name" : "Default"}
+					    	]
+				    	}
 			    	]
 				}
 			}
