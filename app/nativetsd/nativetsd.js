@@ -7,7 +7,7 @@ document.domain = chrome.runtime.id;
 var webView = null;
 
 $(document).ready(function() { 
-  initDb().then(function(){
+  
     $('#snap-btn').button({icons: {primary: 'ui-snap-tsd'}}).click(function(e){
       console.info('Taking Snap...');    
       getSnapshotUrl().then(
@@ -40,7 +40,7 @@ $(document).ready(function() {
         }
       }
     });
-  });
+  
 });
 
 function getSnapshotUrl() {
@@ -111,125 +111,13 @@ function loadWebView(url) {
 
 }
 
-function initDb() {
-  var d = $.Deferred();
-  var promise = d.promise();
-
-  return $.indexedDB("OpenTSDB", { 
-      // The second parameter is optional
-      "version" : 2,  // Integer version that the DB should be opened with
-      "upgrade" : function(transaction){
-        console.info("DB UPGRADE");
-      },
-      "schema" : {
-          "1" : function(transaction){
-              console.info("VERSION 1");
-              initDirectoriesOS(transaction).always(initSnapshotsOS(transaction)).always(initDashboardOS(transaction)).then(
-                function() {
-                  console.info("================ DB Init Complete ================");
-                  d.resolve();
-                },
-                function(error, event) {
-                  console.error("================ DB Init Complete ================: %O", event);
-                  d.reject(event);
-                }
-              );
-          },
-          "2" : function(transaction){
-              console.info("VERSION 2");
-              d.resolve();
-          }
-      }
-  });
-  return promise;
-}
-
-function initDirectoriesOS(tx) {
-  console.info("Creating Snapshot ObjectStore")
-  var d = $.Deferred();
-  var promise = d.promise();
-
-  var directoryObjectStore = tx.createObjectStore("directories", {
-      "keyPath" : 'name' 
-  });    
-  var request = directoryObjectStore.add({name: "Default"});
-  
-  request.done = function(event){ 
-    console.info("----> Inited directories and added Default");
-    promise.resolve();
-  };
-  request.fail = function(e){
-    console.error("Data save failed");
-    console.error(e);
-    tx.abort();
-    promise.reject(e);
-  };
-  return promise;
-}
 
 // http://james.padolsey.com/javascript/parsing-urls-with-the-dom/
-
-function initSnapshotsOS(tx) {  
-  var d = $.Deferred();
-  var p = d.promise();
-  try {
-    var req = tx.createObjectStore("snapshots", {
-      "keyPath" : 'id' ,
-      "autoIncrement" : true
-
-    }).createIndex("fullKeyIndex", "fullKey", true);   
-    req.done(function(){
-      console.info("----> Inited snapshots")
-      d.resolve();
-    });
-  } catch (e) {
-    d.reject(e);
-  }
-  return p;
-}
-
-function initDashboardOS(tx) {  
-  var d = $.Deferred();
-  var p = d.promise();
-  try {
-    var req = tx.createObjectStore("dashboards", {
-      "keyPath" : 'id' ,
-      "autoIncrement" : true
-
-    }).createIndex("dashboardNameIndex", "dashboardName", true);   
-    req.done(function(){
-      console.info("----> Inited dashboards")
-      d.resolve();
-    });
-  } catch (e) {
-    d.reject(e);
-  }
-  return p;
-}
-
-
-
-  function deleteDb(dbname) {
-    var dbRequest = window.indexedDB.deleteDatabase(dbname);
-    dbRequest.onsuccess = function(evt){ console.info("Deleted DB:%o", evt); }
-    dbRequest.onerror = function(evt){ console.error("Failed to delete db: %o", evt.target.error); }  
-  }
-
-
 
 
 
 function saveSnapshot(tsdurl) {
   var dirs = [];
-  var iterationPromise  = $.indexedDB("OpenTSDB").objectStore("directories").each(function(item){
-    dirs.push(item.value.name);
-  });
-  iterationPromise.done(function(result, event){
-    if(result==null) {
-      console.info("Retrieved Directories: [%O]", dirs);
-    }
-  });
-
   var dlg = $( "#dialog_saveSnapshot" ).dialog({ 
     width: 900, 
     height: 300,
@@ -302,95 +190,17 @@ function persistSnapshot() {
 }
 
 function doPersistCategory(category) {
-  console.info("Saving Category: [%O]", category);
-  var d = $.Deferred();
-  var promise = d.promise();
-  var objectStore = $.indexedDB("OpenTSDB").objectStore("directories");
-  objectStore.get(category).done(function(x) {
-    if(x==null) {
-      var addPr = objectStore.add({name: category});
-        addPr.done(function(){
-          d.resolve();
-        });
-        addPr.fail(function(error, event){
-          console.error("Failed to save category: %O - %O", error, event);
-          d.reject(error);
-        });      
-    } else {
-      d.resolve();
-    }
-  });
-  return promise;
+  console.info("Saving Category: [%O] [%O]", category, window.saveItems);
+  return window.saveItems(category);
 }
 
 function doPersistSnapshot(category, title, snapshot) {
   console.info("Saving Snapshot: [%O]", arguments);
-  var d = $.Deferred();
-  var promise = d.promise();
   var key = [category, title, snapshot].join("##")
-  var objectStore = $.indexedDB("OpenTSDB").objectStore("snapshots");
-  objectStore.get(key).done(function(x) {
-    if(x==null) {
-      var value = {'fullKey': key, 'title': title, 'category': category, 'snapshot': snapshot, 'urlparts' : parseURL(snapshot) };
-      var addPr = objectStore.add(value);
-        addPr.done(function(){
-          console.info("Saved Snapshot [%s]", key);
-          d.resolve();
-        });
-        addPr.fail(function(error, event){
-          console.error("Failed to save snapshot: %O", error);
-          d.reject(error);
-        });      
-    } else {
-      d.resolve();
-    }
-  });
-  return promise;
+  var value = {'fullKey': key, 'title': title, 'category': category, 'snapshot': snapshot, 'urlparts' : parseURL(snapshot) };
+  return window.saveItems(value)
 }
 
-/*
-
-
-
-  <div id="dialog_saveSnapshot" title="OpenTSDB Console: Save Chart Snapshot" >  
-    <form>
-      <fieldset>
-        <label for="category">Category:</label>
-        <input type="text" name="category" id="category" class="text ui-widget-content ui-corner-all" value="" style="width: 65%">
-        <label for="snapshot">Snapshot:</label>
-        <input type="text" name="snapshot" id="snapshot" class="text ui-widget-content ui-corner-all" value="" style="width: 95%">
-      </fieldset>
-    </form>  
-      <div id="tabs" >
-        <ul>
-            <li><a id="savesnapshot-btn">Save</a></li>
-            <li><a id="cancelsnapshot-btn">Cancel</a></li>
-        </ul>
-        </div>    
-  </div>
-
-
-
-
-function onWebViewLoaded() {
-  console.dir(arguments);
-}
-
-function loadWebView(url) {
-  var fqUrl = "/app/nativetsd/tsdwindow.html";
-  console.info("Loading OpenTSDB Native Console at [%s] in window [%s]", url, fqUrl);
-  chrome.app.window.create(fqUrl, {
-  'id' : 'tsdWindow',
-  'state' : 'normal',
-    'bounds' : {
-      'width': Math.round(window.screen.availWidth*0.8),
-      'height': Math.round(window.screen.availHeight*0.8),
-      'left' : Math.round((window.screen.availWidth-(window.screen.availWidth*0.8))/2),
-      'top' : Math.round((window.screen.availHeight-(window.screen.availHeight*0.8))/2)
-    }
-  });
-}
-*/
 
 // This function creates a new anchor element and uses location
 // properties (inherent) to get the desired URL data. Some String

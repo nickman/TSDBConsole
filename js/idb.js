@@ -4,6 +4,7 @@ var xschema = null;
 var executableSchema = null;
 var initialized = false;
 
+
 $(document).ready(function() { 
     console.info("Initializing DB....");
     initDb().then(function(){
@@ -74,7 +75,9 @@ function indexFx(objectStore, indexName, field, unique) {
 
 function dataFx(cfg) {    
   return function _datafx_(tx) {
-    return executeJson(cfg.commands, {transaction: tx});
+    var p =executeJson(cfg.commands, {transaction: tx, database: cfg.database, objectstore: cfg.objectstore});
+    console.info("JSON Execution Promise: %O", p) ;
+    return p;
   }
 }
 
@@ -102,12 +105,14 @@ function prepareSchema(config) {
           schema[version].push(indexFx(osName, indexName, indexCfg.field, indexCfg.unique));
         }
       }
+      /*
       if(cfg.commands!=null && $.isArray(cfg.commands) && cfg.commands.length > 0) {                
           console.info("Staging [%s] Data Items for [%s]", cfg.commands.length, osName);
           cfg.database = DBNAME;
           cfg.objectstore = osName;
           schema[version].push(dataFx(cfg));
       }
+      */
     }    
   }
   xschema = schema;
@@ -133,8 +138,8 @@ function executeSchema(config) {
     console.info("Staging [%s] functions for Version [%s]", schema[version].length, version);
     var vx = version;
     var schv = schema[version];
-    execSchema[version] = schema[version].length==0 ? function(tx){} : function(tx){        
-      console.info("Executing DB Upgrade Stage [%s]", version);  
+    execSchema[version] = schema[version].length==0 ? function(tx){} : function(tx){    
+      console.info("Executing DB Upgrade Stage [%s]", version);        
       var r = null;
       $.each(schv, function(idx, fx){
         console.info("Invoking [%s]", fx.name);
@@ -143,7 +148,8 @@ function executeSchema(config) {
         } else {
           r = fx(tx);          
         }      
-      });        
+      });  
+      //console.info("Schema Execution Promise: %O", r.state());
       return r;
     }
   }
@@ -155,23 +161,44 @@ function initDb() {
   if(initialized) return;
   var d = $.Deferred();
   var promise = d.promise(); 
+  var upgrades = [];
   try {
     var p = getJSON("/js/idb.json").then(function(result){
       var config = JSON.parse(result);
+      console.info("Upgrade Config: %O", config);
       var openPromise = $.indexedDB(config.dbname, {
-        "version" : config.version,
+        //"version" : config.version,
         "upgrade" : function(transaction){
-          console.info("DB UPGRADE: [%O]", arguments);          
+          console.info("DB UPGRADE");          
         }        
         ,"schema" : executeSchema(config)
+      });      
+      openPromise.done(function(db, event){
+        console.info("DB Open/Upgrade Complete: [%s]. Upgrades: [%s]", db.name, JSON.stringify(upgrades));
+        var promises = [];
+        $.each(upgrades, function(vidx, upgradeVersion) {
+          $.each(config.objectStores, function(oidx, objectStore) {
+            if(objectStore.versions[upgradeVersion]) {
+              var cfg = objectStore.versions[upgradeVersion];
+              if(cfg.commands) {
+                if(cfg.commands.length>0) {
+                  console.info("Executing data commands for data store [%s], version [%s]", oidx, upgradeVersion);
+                  promises.push(executeJson(cfg.commands, {database: db.name, objectstore: oidx}));
+                }
+              }
+            }
+          });
+        });
+        $.when(promises).then(function(){
+          console.info("ALL DB UPGRADES AND DATA OPS COMPLETE");
+          d.resolve();
+          initialized = true;
+        });
       });
-      openPromise.done(function(){
-        console.info("DB Open/Upgrade Complete: [%O]", arguments);
-        d.resolve();
-        initialized = true;
-      });
-      openPromise.progress(function(){
-        console.info("DB Upgrade In Process: [%O]", arguments);
+      openPromise.progress(function(db, versionChangeEvent){
+        console.info("DB Upgrade In Process: version %s --> %s", versionChangeEvent.oldVersion, versionChangeEvent.newVersion);
+        upgrades.push(versionChangeEvent.newVersion);
+        
       });
       openPromise.fail(function(){
         console.error("DB Upgrade Failed: [%O]", arguments);
@@ -250,6 +277,26 @@ function listKeyTest(match) {
 
 
 
+function list(dbName, osName) {
+  var d = $.Deferred();
+  var promise = d.promise(); 
+  var items = [];
+  var iterationPromise = $.indexedDB(dbName)
+        .objectStore(osName)
+          .each(function(item){
+            items.append(item.value);
+            d.progress(item.value);
+          }); 
+  iterationPromise.done(function(result, event){
+    if(result==null) {
+      d.resolve(items);
+    }
+  });
+    
+  return promise;  
+}
+
+
 function dbList(query, keys) {
   // db, ostore, comp, index,  keys
   var values = [];
@@ -308,6 +355,13 @@ function pick(idx) {
   return null;
 }
 
+function arr(obj) {
+  if(obj==null) return [];
+  if($.isArray(obj)) return obj;
+  return [obj];
+}
+
+
 // "/js/test-data.json"
 // executeJson("/js/test-data.json").then(function(x) { console.info("Complete: [%O]", x); });
 
@@ -325,76 +379,54 @@ function executeJson(src, target) {
     try { window.URL.revokeObjectURL(url); } catch (e) {}
     var isArr = $.isArray(result);
     var cmds = JSON.parse(isArr ? result[0] : result);
-    var cmdArray = $.isArray(cmds) ? cmds : [cmds];
+    var cmdArray = arr(cmds);
     console.info("Processing [%s] JSON DB Commands", cmdArray.length);
     $.each(cmdArray, function(idx, cmd){
       var dbName = pick('database', cmd, target);
       var osName = pick('objectstore', cmd, target);
       if(pick('transaction', target)!=null) {
-        promises.push(executeParsedCommands(target.transaction, cmd));  
+        promises.push(executeParsedCommands(target.transaction, osName, dbName, cmd));  
       } else {
         if(dbName==null || osName==null) throw "JSON did not contain 'transaction' or 'database' and/or 'objectstore' and none supplied in target";
-        var d = $.Deferred();
-        var p = d.promise();
-        promises.push(p);
-        $.indexedDB(dbName).transaction(osName).progress(function (tx){
-          promises.push(p.then(executeParsedCommands(tx, cmd)));  
+        
+        var txpromise = $.indexedDB(dbName).transaction(osName);
+        promises.push(txpromise);
+        txpromise.progress(function (tx){
+          promises.push(executeParsedCommands(tx, osName, dbName, cmd));  
         });
+        txpromise.fail(function (event){
+          console.error("Failed to start TX [%O]", event);
+        });
+        txpromise.done(function (event){
+          console.info("Non Upgrade Transaction Completed")
+        });
+
       }
     });
   });
   return $.when(promises);
 }
 
-function executeParsedCommands(tx, commands) {
-  var promises = [];
-  var objectStore = tx.objectStore(osName);
-  $.each(commands.commands, function(idx, cmd){
-      switch(cmd.command) {
-        case "insert":
-          console.group("Processing [%s] inserts against [%s/%s]", cmd.data.length, dbName, osName);
-          $.each(cmd.data, function(idx, data) {
-            //console.info("Adding [%s]", JSON.stringify(data));
-            promises.push(objectStore.add(data));
-          }); 
-          console.info("Inserts complete [%s/%s/%s]", cmd.data.length, dbName, osName);
-          console.groupEnd();
-          break;
-        case "delete":
-          console.info("Processing [%s] deletes against [%s/%s]", cmd.data.length, dbName, osName);
-          $.each(cmd.data, function(idx, data) {
-            promises.delete(objectStore.add(data));
-          });            
-          break;
-        case "update":
-          throw "Update not supported yet";
-          break;
-        default:
-          console.warn("Unrecognized Command [%s]", cmd.command);
-      }
-  });      
-  return $.when(promises);
-}
+function executeParsedCommands(tx, osName, dbName, commands) {
+  try {
 
-
-/*
-function executeParsedCommands(dbName, osName, commands) {
-  var transactionPromise = $.indexedDB(dbName).transaction(osName);  
-  transactionPromise.done(function(event){
-    console.info("Commands TX Complete: [%O]", event);
-  });
-
-  var promises = [transactionPromise];
-  transactionPromise.progress(function(tx){
-    var objectStore = tx.objectStore("objectStoreName");
-    $.each(commands.commands, function(idx, cmd){
+    var promises = [];
+    var objectStore = tx.objectStore(osName);
+    var jcmds = arr(commands);
+    $.each(jcmds, function(idx, cmds){
+      $.each(arr(cmds), function(idx2, cmd){
+        if(!cmd.command && $.isArray(cmd.commands) && cmd.commands.length >0 && cmd.commands[0].command) {
+          cmd = cmd.commands[0];
+        }
         switch(cmd.command) {
           case "insert":
-            console.info("Processing [%s] inserts against [%s/%s]", cmd.data.length, dbName, osName);
+            console.group("Processing [%s] inserts against [%s/%s]", cmd.data.length, dbName, osName);
             $.each(cmd.data, function(idx, data) {
-              promises.add(objectStore.add(data));
+              console.info("Adding [%s]", JSON.stringify(data));
+              promises.push(objectStore.add(data));
             }); 
             console.info("Inserts complete [%s/%s/%s]", cmd.data.length, dbName, osName);
+            console.groupEnd();
             break;
           case "delete":
             console.info("Processing [%s] deletes against [%s/%s]", cmd.data.length, dbName, osName);
@@ -408,186 +440,42 @@ function executeParsedCommands(dbName, osName, commands) {
           default:
             console.warn("Unrecognized Command [%s]", cmd.command);
         }
+      });
     });      
-  });
-  return $.when(promises);
+    return $.when(promises);
+  } catch (e) {
+    console.error("executeParsedCommands failed: %O", e);
+    throw e;
+  }
 }
 
- */
-
-
-/*
-
-{
-  "dbname": "OpenTSDB",
-  "version" : 1,
-  "objectStores" : {
-    "directories" : {
-      "versions" : {
-        "1" : {
-          "keyPath" : "id",
-          "autoIncrement" : true,
-              "indexes" : {
-                "nameIndex" : {
-                  "field" : "name",
-                  "unique" : true
-                }           
-            },
-            "commands" : [
-              {
-                "command" : "insert",
-                "data" : [
-                  {"name" : "Default"}
-                ]
-              }
-            ]
-
-[
-  {
-    "database" : "OpenTSDB",
-    "objectstore" : "directories",
-    "commands" : [
-      {
-        "command" : "insert",
-        "data" : [
-            {"name" : "java.runtime.name"},
-            {"name" : "sun.boot.library.path"},
-            {"name" : "java.vm.version"},
-            {"name" : "java.vm.vendor"},
-            {"name" : "java.vendor.url"},
-            {"name" : "path.separator"},
-
-
-*/
-
-
-function saveSnapshot(tsdurl) {
-  var dirs = [];
-  var iterationPromise  = $.indexedDB("OpenTSDB").objectStore("directories").each(function(item){
-    dirs.push(item.value.name);
-  });
-  iterationPromise.done(function(result, event){
-    if(result==null) {
-      console.info("Retrieved Directories: [%O]", dirs);
-    }
-  });
-
-  var dlg = $( "#dialog_saveSnapshot" ).dialog({ 
-    width: 900, 
-    height: 300,
-    modal: true,    
-    closeOnEscape: true, 
-    buttons: {
-      Save : function() {
-        $('#dialog_saveSnapshotErr').remove();
-        var self = this;
-        try {
-          persistSnapshot($('#dialog_saveSnapshot')).then(
-            function() {
-              // Complete
-              $.jGrowl("Snapshot Saved")
-              $( self ).dialog( "close" );              
-            },
-            function(error, event) {
-              // Error
-            }
-          );          
-        } catch (errors) {
-
-            var msg = "<div id='dialog_saveSnapshotErr'><font color='red'>ERROR:<ul>";
-            if($.isArray(errors)) {
-              $.each(errors, function(index, m) {
-                msg += "<li>" + m + "</li>";
-              });
-            } else {
-              console.error("Save Snapshot Error: %O", errors);
-              msg += "<li>" + errors.message + "<ul><li>" + errors.stack + "</li></ul></li>";
-            }
-            msg += "</ul></font></div>";
-            $('#dialog_saveSnapshot').append(msg);   
-            msg = null;         
-        }
-      },
-      Cancel: function() {
-          $('#dialog_saveSnapshotErr').remove();
-          $( this ).dialog( "close" );
-      }
-    }
-  });
-  console.info("Save Dialog: %O", dlg);
-  $('#snapshot').val(decodeURIComponent(tsdurl));
-  $('#category').combobox(dirs);
-
-}
-
-
-
-function persistSnapshot() {
-  // title, category, snapshot
-  var errors = [];
-  var title = $('#title').val();  
-  if(title==null || title.trim()=="") {
-    errors.push("Title was empty");
-  }
-  var category = $('#category').val();
-  if(category==null || category.trim()=="") {
-    errors.push("Directory was empty");
-  }
-  var snapshot = $('#snapshot').val();
-  if(snapshot==null || snapshot.trim()=="") {
-    errors.push("Snapshot was empty");
-  }
-  if(errors.length > 0) {
-    throw(errors);
-  }
-  return doPersistCategory(category).then(doPersistSnapshot(category, title, snapshot))
-}
-
-function doPersistCategory(category) {
-  console.info("Saving Category: [%O]", category);
+function saveItems(dbName, osName, object) {  
   var d = $.Deferred();
-  var promise = d.promise();
-  var objectStore = $.indexedDB("OpenTSDB").objectStore("directories");
-  objectStore.get(category).done(function(x) {
-    if(x==null) {
-      var addPr = objectStore.add({name: category});
-        addPr.done(function(){
-          d.resolve();
+  var p = d.promise();
+  if(object==null) {
+    d.resolve();
+  } else {
+    var txpromise = $.indexedDB(dbName).transaction(osName);  
+    txpromise.progress(function (tx){
+        console.group("Saving items to [%s/%s]", dbName, osName);
+        var os = tx.objectStore(osName);
+        var toSaves = arr(object);
+        $.each(toSaves, function(idx, item){
+          os.add(item);
+          console.info("Saved [%s]", JSON.stringify(item));
         });
-        addPr.fail(function(error, event){
-          console.error("Failed to save category: %O - %O", error, event);
-          d.reject(error);
-        });      
-    } else {
-      d.resolve();
-    }
-  });
-  return promise;
-}
-
-function doPersistSnapshot(category, title, snapshot) {
-  console.info("Saving Snapshot: [%O]", arguments);
-  var d = $.Deferred();
-  var promise = d.promise();
-  var key = [category, title, snapshot].join("##")
-  var objectStore = $.indexedDB("OpenTSDB").objectStore("snapshots");
-  objectStore.get(key).done(function(x) {
-    if(x==null) {
-      var value = {'fullKey': key, 'title': title, 'category': category, 'snapshot': snapshot, 'urlparts' : parseURL(snapshot) };
-      var addPr = objectStore.add(value);
-        addPr.done(function(){
-          console.info("Saved Snapshot [%s]", key);
-          d.resolve();
-        });
-        addPr.fail(function(error, event){
-          console.error("Failed to save snapshot: %O", error);
-          d.reject(error);
-        });      
-    } else {
-      d.resolve();
-    }
-  });
-  return promise;
+    });
+    txpromise.fail(function (event){
+      console.groupEnd();
+      console.error("Failed to start TX [%O]", event);
+      d.reject(event.type);
+    });
+    txpromise.done(function (event){
+      console.groupEnd();
+      console.info("Save complete");
+    });
+  }
+  return p;
 }
 
 

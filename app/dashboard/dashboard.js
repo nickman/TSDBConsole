@@ -77,8 +77,9 @@ function makeDialog() {
               $("#psCatList").append(itemval);
             });
           });
-          $("#psCatList").on( "select", function(){
+          $("#psCatList").change(function(){
             var selectedCat = $("#psCatList option:selected").text();
+            console.info("Selected [%s]", selectedCat);
             if(selectedCat==null || selectedCat=="") return;
             $("#psTitleList").empty();
             var filter = function(item) {
@@ -86,7 +87,7 @@ function makeDialog() {
             }
             dbList({db: "OpenTSDB", ostore: "snapshots", comp: filter}).then(function(shots){
               $.each(shots, function(index, shot) {
-                var itemval= '<option value="' + cat.category + '">' + cat.category + '</option>';
+                var itemval= $('<option value="' + shot.title + '">' + shot.title + '</option>').data('snapshot', shot);
                 $("#psTitleList").append(itemval);
               });
             });

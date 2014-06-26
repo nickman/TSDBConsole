@@ -6,7 +6,7 @@
           "partitions": [     
                {
                     "name": "servers",
-                    "accessible_resources": ["/asynch/server/asynch.*", "/js/jquery/jquery-2.0.3.js"]
+                    "accessible_resources": ["/asynch/server/asynch.*", "/js/jquery/jquery-2.0.3.js", "/js/idb.js"]
                }
           ]
      },
