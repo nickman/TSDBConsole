@@ -6,9 +6,19 @@ var initialized = false;
 
 $(document).ready(function() { 
     console.info("Initializing DB....");
-    initDb();
-    console.info("Initialized DB");
+    initDb().then(function(){
+      console.info("Initialized DB");
+    });
+    
 });
+
+function reinitDb() {
+  initialized = false;
+  deleteDatabase('OpenTSDB');
+  initDb().then(function(){
+    console.info("Initialized DB");
+  });  
+}
 
 function getJSON(url) {
   var d = $.Deferred();
@@ -62,22 +72,9 @@ function indexFx(objectStore, indexName, field, unique) {
   }
 }
 
-function dataFx(objectStore, data) {    
+function dataFx(cfg) {    
   return function _datafx_(tx) {
-    
-
-    var promise = null;
-    for(index in data) {
-      if(data[index]!=null) {        
-        if(promise==null) {
-          promise = tx.objectStore(objectStore).add(data[index]);
-        } else {
-          promise.then(tx.objectStore(objectStore).add(data[index]));
-        }
-        console.info("Added data to store [%s] --> [%s]", objectStore, JSON.stringify(data[index]));
-      }
-    }
-    return promise;
+    return executeJson(cfg.commands, {transaction: tx});
   }
 }
 
@@ -85,6 +82,7 @@ function dataFx(objectStore, data) {
 function prepareSchema(config) {
   var schema = {};
   var createdObjectStores = [];
+  var DBNAME = config.dbname;
   for(var i = 1; i <= config.version; i++) {
     schema[i] = [];
   }
@@ -104,9 +102,11 @@ function prepareSchema(config) {
           schema[version].push(indexFx(osName, indexName, indexCfg.field, indexCfg.unique));
         }
       }
-      if(cfg.commands!=null) {                
-          console.info("[Data] for [%s], Items: [%s]", osName, cfg.commands.length);
-          schema[version].push(dataFx(osName, cfg.commands));
+      if(cfg.commands!=null && $.isArray(cfg.commands) && cfg.commands.length > 0) {                
+          console.info("Staging [%s] Data Items for [%s]", cfg.commands.length, osName);
+          cfg.database = DBNAME;
+          cfg.objectstore = osName;
+          schema[version].push(dataFx(cfg));
       }
     }    
   }
@@ -125,6 +125,7 @@ function isPromise(value) {
 }
 
 function executeSchema(config) {
+  console.info("Preparing IndexedDB Upgrade Schema");
   var schema = prepareSchema(config);
   var execSchema = {};
   var maxVersion = config.version;
@@ -132,16 +133,17 @@ function executeSchema(config) {
     console.info("Staging [%s] functions for Version [%s]", schema[version].length, version);
     var vx = version;
     var schv = schema[version];
-    execSchema[version] = schema[version].length==0 ? function(tx){} : function(tx){          
+    execSchema[version] = schema[version].length==0 ? function(tx){} : function(tx){        
+      console.info("Executing DB Upgrade Stage [%s]", version);  
       var r = null;
-      for(f in schv) {
-        var fx = schv[f];        
+      $.each(schv, function(idx, fx){
+        console.info("Invoking [%s]", fx.name);
         if(isPromise(r)) {
           r.then(fx(tx));
         } else {
           r = fx(tx);          
         }      
-      }
+      });        
       return r;
     }
   }
@@ -156,16 +158,15 @@ function initDb() {
   try {
     var p = getJSON("/js/idb.json").then(function(result){
       var config = JSON.parse(result);
-      var schema = executeSchema(config);
       var openPromise = $.indexedDB(config.dbname, {
         "version" : config.version,
         "upgrade" : function(transaction){
           console.info("DB UPGRADE: [%O]", arguments);          
         }        
-        ,"schema" : schema
+        ,"schema" : executeSchema(config)
       });
       openPromise.done(function(){
-        console.info("DB Open/Upgade Complete: [%O]", arguments);
+        console.info("DB Open/Upgrade Complete: [%O]", arguments);
         d.resolve();
         initialized = true;
       });
@@ -295,14 +296,26 @@ function dbList(query, keys) {
   return promise;
 }
 
+function pick(idx) {
+  if(arguments.length < 2) return null;
+  for(var x = 1, y = arguments.length; x < y; x++) {
+    if(arguments[x]!=null) {
+      if(arguments[x][idx]!=null) {
+        return arguments[x][idx];
+      }
+    }
+  }
+  return null;
+}
 
 // "/js/test-data.json"
 // executeJson("/js/test-data.json").then(function(x) { console.info("Complete: [%O]", x); });
 
 function executeJson(src, target) {
+  console.info("Executing JSON DB Commands: [%O], target: [%O]", src, target);
   if(src==null) return;
   var url = null;
-  if($.isPlainObject(src)) {
+  if($.isPlainObject(src) || $.isArray(src)) {
     url = window.URL.createObjectURL(new Blob([JSON.stringify(src)], {type: 'text/json'}));
   } else {
     url = src;
@@ -310,67 +323,56 @@ function executeJson(src, target) {
   var promises = [];
   getJSON(url).then(function(result){
     try { window.URL.revokeObjectURL(url); } catch (e) {}
-    var dbName = null;
-    var osName = null;
     var isArr = $.isArray(result);
     var cmds = JSON.parse(isArr ? result[0] : result);
-    // cmds could be an array
-    var cmdArray = null;
-    if($.isArray(cmds)) {
-      cmdArray = cmds;
-    } else {
-      cmdArray = [cmds];
-    }
+    var cmdArray = $.isArray(cmds) ? cmds : [cmds];
     console.info("Processing [%s] JSON DB Commands", cmdArray.length);
     $.each(cmdArray, function(idx, cmd){
-      if(cmd.database==null) {
-        if(target==null || target.database==null || target.objectstore==null || ) throw "JSON did not contain 'database' and/or 'objectstore' and none supplied in target";
-        dbName = target.database;
-        osName = target.objectstore;
+      var dbName = pick('database', cmd, target);
+      var osName = pick('objectstore', cmd, target);
+      if(pick('transaction', target)!=null) {
+        promises.push(executeParsedCommands(target.transaction, cmd));  
       } else {
-        dbName = cmd.database;
-        osName = cmd.objectstore;
+        if(dbName==null || osName==null) throw "JSON did not contain 'transaction' or 'database' and/or 'objectstore' and none supplied in target";
+        var d = $.Deferred();
+        var p = d.promise();
+        promises.push(p);
+        $.indexedDB(dbName).transaction(osName).progress(function (tx){
+          promises.push(p.then(executeParsedCommands(tx, cmd)));  
+        });
       }
-      promises.push(executeParsedCommands(dbName, osName, cmd));
     });
   });
   return $.when(promises);
 }
 
-function executeParsedCommands(dbName, osName, commands) {
-  var transactionPromise = $.indexedDB(dbName).transaction(osName);  
-  transactionPromise.done(function(event){
-    console.info("Commands TX Complete: [%O]", event);
-  });
-
-  var promises = [transactionPromise];
-  transactionPromise.progress(function(tx){
-    var objectStore = tx.objectStore(osName);
-    $.each(commands.commands, function(idx, cmd){
-        switch(cmd.command) {
-          case "insert":
-            console.group("Processing [%s] inserts against [%s/%s]", cmd.data.length, dbName, osName);
-            $.each(cmd.data, function(idx, data) {
-              //console.info("Adding [%s]", JSON.stringify(data));
-              promises.push(objectStore.add(data));
-            }); 
-            console.info("Inserts complete [%s/%s/%s]", cmd.data.length, dbName, osName);
-            console.groupEnd();
-            break;
-          case "delete":
-            console.info("Processing [%s] deletes against [%s/%s]", cmd.data.length, dbName, osName);
-            $.each(cmd.data, function(idx, data) {
-              promises.delete(objectStore.add(data));
-            });            
-            break;
-          case "update":
-            throw "Update not supported yet";
-            break;
-          default:
-            console.warn("Unrecognized Command [%s]", cmd.command);
-        }
-    });      
-  });
+function executeParsedCommands(tx, commands) {
+  var promises = [];
+  var objectStore = tx.objectStore(osName);
+  $.each(commands.commands, function(idx, cmd){
+      switch(cmd.command) {
+        case "insert":
+          console.group("Processing [%s] inserts against [%s/%s]", cmd.data.length, dbName, osName);
+          $.each(cmd.data, function(idx, data) {
+            //console.info("Adding [%s]", JSON.stringify(data));
+            promises.push(objectStore.add(data));
+          }); 
+          console.info("Inserts complete [%s/%s/%s]", cmd.data.length, dbName, osName);
+          console.groupEnd();
+          break;
+        case "delete":
+          console.info("Processing [%s] deletes against [%s/%s]", cmd.data.length, dbName, osName);
+          $.each(cmd.data, function(idx, data) {
+            promises.delete(objectStore.add(data));
+          });            
+          break;
+        case "update":
+          throw "Update not supported yet";
+          break;
+        default:
+          console.warn("Unrecognized Command [%s]", cmd.command);
+      }
+  });      
   return $.when(promises);
 }
 
