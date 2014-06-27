@@ -275,6 +275,10 @@ function listKeyTest(match) {
   dbList({db: "OpenTSDB", ostore: "categories", comp: gFilter}, match).then(dbhandler);
 }
 
+function dump(dbName, osName) {
+
+}
+
 
 
 function list(dbName, osName) {
@@ -284,7 +288,7 @@ function list(dbName, osName) {
   var iterationPromise = $.indexedDB(dbName)
         .objectStore(osName)
           .each(function(item){
-            items.append(item.value);
+            items.push(item.value);
             d.progress(item.value);
           }); 
   iterationPromise.done(function(result, event){

@@ -135,7 +135,7 @@ function saveSnapshot(tsdurl) {
               $( self ).dialog( "close" );              
             },
             function(error, event) {
-              // Error
+              console.error("Failed to save: %s", error);
             }
           );          
         } catch (errors) {
@@ -186,19 +186,19 @@ function persistSnapshot() {
   if(errors.length > 0) {
     throw(errors);
   }
-  return doPersistCategory(category).then(doPersistSnapshot(category, title, snapshot))
+  return $.when(doPersistCategory(category), doPersistSnapshot(category, title, snapshot));
 }
 
 function doPersistCategory(category) {
-  console.info("Saving Category: [%O] [%O]", category, window.saveItems);
-  return window.saveItems(category);
+  console.info("Saving Category: [%O]", category);
+  return saveItems('OpenTSDB', 'directories', category);
 }
 
 function doPersistSnapshot(category, title, snapshot) {
   console.info("Saving Snapshot: [%O]", arguments);
   var key = [category, title, snapshot].join("##")
   var value = {'fullKey': key, 'title': title, 'category': category, 'snapshot': snapshot, 'urlparts' : parseURL(snapshot) };
-  return window.saveItems(value)
+  return saveItems('OpenTSDB', 'snapshots', value);
 }
 
 

@@ -71,12 +71,6 @@ function makeDialog() {
         height: 'auto',
         position: ['center', 'center'],
         create: function(event, ui) {
-          dbList({db: "OpenTSDB", ostore: "directories"}).then(function(cats){
-            $.each(cats, function(index, cat) {
-              var itemval= '<option value="' + cat.name + '">' + cat.name + '</option>';
-              $("#psCatList").append(itemval);
-            });
-          });
           $("#psCatList").change(function(){
             var selectedCat = $("#psCatList option:selected").text();
             console.info("Selected [%s]", selectedCat);
@@ -97,6 +91,14 @@ function makeDialog() {
         open:  function(event, ui) {
           //clearBoth();
           //popDirectories();
+          $("#psCatList").children().remove();
+          dbList({db: "OpenTSDB", ostore: "directories"}).then(function(cats){
+            $.each(cats, function(index, cat) {
+              var itemval= '<option value="' + cat.name + '">' + cat.name + '</option>';
+              $("#psCatList").append(itemval);
+            });
+          });
+
           $("#psCatList").width("90%");
           $("#psTitleList").width("90%");
           $("#psCatFilter").width("90%");

@@ -1,0 +1,32 @@
+[
+	{
+		"database" : "OpenTSDB",
+		"objectstore" : "directories",
+		"commands" : [
+			{
+				"command" : "insert",
+				"data" : [
+					{"name" :"Host System Status"}
+				]
+			}
+		]
+	},
+	{
+		"database" : "OpenTSDB",
+		"objectstore" : "snapshots",
+		"commands" : [
+			{
+				"command" : "insert",
+				"data" : [
+					{"fullKey":"System##System CPU Summary##http://localhost:8080/q?start=5m-ago&ignore=7&m=sum:sys.cpu{cpu=*,type=combined,host=tpmint}&o=&yrange=[0:]&key=out right top box&wxh=1200x300&png","title":"System CPU Summary","category":"System","snapshot":"http://localhost:8080/q?start=5m-ago&ignore=7&m=sum:sys.cpu{cpu=*,type=combined,host=tpmint}&o=&yrange=[0:]&key=out right top box&wxh=1200x300&png","urlparts":{"source":"http://localhost:8080/q?start=5m-ago&ignore=7&m=sum:sys.cpu{cpu=*,type=combined,host=tpmint}&o=&yrange=[0:]&key=out right top box&wxh=1200x300&png","protocol":"http","host":"localhost","port":"8080","query":"?start=5m-ago&ignore=7&m=sum:sys.cpu{cpu=*,type=combined,host=tpmint}&o=&yrange=[0:]&key=out%20right%20top%20box&wxh=1200x300&png","params":{"start":"5m-ago","ignore":"7","m":"sum:sys.cpu{cpu","o":"","yrange":"[0:]","key":"out%20right%20top%20box","wxh":"1200x300"},"file":"q","hash":"","path":"/q","relative":"/q?start=5m-ago&ignore=7&m=sum:sys.cpu{cpu=*,type=combined,host=tpmint}&o=&yrange=[0:]&key=out%20right%20top%20box&wxh=1200x300&png","segments":["q"]}},
+					{"fullKey":"Default##Complex##http://localhost:8080/q?start=5m-ago&ignore=1&m=avg:sys.cpu{cpu=*,type=comb…int}&o=&m=sum:1m-avg:rate:sys.fs.bytes{dir=*,type=ext4,host=tpmint}&o=axis x1y2&ylabel=CPU Percent Usage&y2label=File System Byte Rate&yrange=[0:100]&y2range=[0:]&wxh=900x300&smooth=csplines&png","title":"Complex","category":"Default","snapshot":"http://localhost:8080/q?start=5m-ago&ignore=1&m=avg:sys.cpu{cpu=*,type=comb…int}&o=&m=sum:1m-avg:rate:sys.fs.bytes{dir=*,type=ext4,host=tpmint}&o=axis x1y2&ylabel=CPU Percent Usage&y2label=File System Byte Rate&yrange=[0:100]&y2range=[0:]&wxh=900x300&smooth=csplines&png","urlparts":{"source":"http://localhost:8080/q?start=5m-ago&ignore=1&m=avg:sys.cpu{cpu=*,type=comb…int}&o=&m=sum:1m-avg:rate:sys.fs.bytes{dir=*,type=ext4,host=tpmint}&o=axis x1y2&ylabel=CPU Percent Usage&y2label=File System Byte Rate&yrange=[0:100]&y2range=[0:]&wxh=900x300&smooth=csplines&png","protocol":"http","host":"localhost","port":"8080","query":"?start=5m-ago&ignore=1&m=avg:sys.cpu{cpu=*,type=combined,host=tpmint}&o=&m=sum:1m-avg:rate:sys.fs.bytes{dir=*,type=ext4,host=tpmint}&o=axis%20x1y2&ylabel=CPU%20Percent%20Usage&y2label=File%20System%20Byte%20Rate&yrange=[0:100]&y2range=[0:]&wxh=900x300&smooth=csplines&png","params":{"start":"5m-ago","ignore":"1","m":"sum:1m-avg:rate:sys.fs.bytes{dir","o":"axis%20x1y2","ylabel":"CPU%20Percent%20Usage","y2label":"File%20System%20Byte%20Rate","yrange":"[0:100]","y2range":"[0:]","wxh":"900x300","smooth":"csplines"},"file":"q","hash":"","path":"/q","relative":"/q?start=5m-ago&ignore=1&m=avg:sys.cpu{cpu=*,type=combined,host=tpmint}&o=&m=sum:1m-avg:rate:sys.fs.bytes{dir=*,type=ext4,host=tpmint}&o=axis%20x1y2&ylabel=CPU%20Percent%20Usage&y2label=File%20System%20Byte%20Rate&yrange=[0:100]&y2range=[0:]&wxh=900x300&smooth=csplines&png","segments":["q"]}} 
+
+				]
+			}
+		]
+	}
+
+]
+
+
+
