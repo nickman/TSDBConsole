@@ -19,6 +19,20 @@
             .substring(1)	
  	}
 
+ 	OpenTSDBURL.durations = {
+ 		s : 'seconds',
+ 		m : 'minutes',
+ 		h : 'hours',
+ 		d : 'days',
+ 		w : 'weeks',
+ 		mn : 'months',
+ 		y : 'years'
+ 	}
+
+ 	OpenTSDBURL.aggregators = ["min","mimmin","max","mimmax","dev","sum","avg","zimsum"];
+
+
+
  	// Determines if the passed string appears to be encoded
  	// by scanning for a few common encoded symbols
  	OpenTSDBURL._isEncoded = function(urlstring) {
@@ -47,6 +61,83 @@
  		try {
  			return parseInt(value.trim());
  		} catch (e) { return null; }
+ 	}
+
+ 	OpenTSDBURL._parseRate = function(value) {
+		// rate can be:
+			// rate
+			// rate{opts}
+				// counter
+				// counter, max
+				// counter ,, reset
+				// counter, max, reset
+		var rate = {};
+		var rateOptions = /\{(.*?)\}/g.exec(metric.rate)[1].split(',');
+		var max = null, reset = null;
+		switch(rateOptions.length) {
+			case 1:
+				rate.counter = 'counter';
+				break;
+			case 2:
+				rate.counter = 'counter';
+				max = OpenTSDBURL._getInt(rateOptions[1]);	 					
+				if(max) rate.max = max;
+				break;
+			case 3:
+				rate.counter = 'counter';
+				max = OpenTSDBURL._getInt(rateOptions[1]);	 					
+				if(max) rate.max = max;
+				reset = OpenTSDBURL._getInt(rateOptions[2]);	 					
+				if(reset) rate.reset = reset;
+				break;	 				
+		}
+		metric.rate = rate;
+ 	}
+
+	OpenTSDBURL._parseTags = function(value) { 	
+		var tags = {};
+ 		var tagDefs = /\{(.*?)\}/g.exec(value)[1].split(',');
+ 		for(var x = 0, y = tagDefs.length; x < y; x++) {
+ 			console.info("TAG PAIR: [%s]", tagDefs[x]);
+ 			if(tagDefs[x].indexOf("=")) {
+ 				var tagPair = tagDefs[x].split("=");
+ 				if(tagPair.length==2) {
+ 					tagPair[0] = tagPair[0].trim();
+ 					tagPair[1] = tagPair[1].trim();
+ 					if(tagPair[0]!='' && tagPair[1]!='') {
+ 						tags[tagPair[0]] = tagPair[1];
+					}
+ 				}
+ 			}
+ 		}
+ 		return tags;
+	}
+
+ 	OpenTSDBURL._parseDownsample = function(value) {
+ 		// 1m-avg
+ 		var err = null;
+ 		try {
+ 			var downsample = {};
+ 			var vals = value.toLowerCase().split("-");
+ 			vals.every(function(val, idx, arr){ arr[idx] = val.trim(); });
+ 			if(OpenTSDBURL.aggregators.indexOf(vals[1])==-1) {
+ 				err = "Invalid aggregator: [" + vals[1] + "]";
+ 				throw err;
+ 			}
+ 			downsample.aggregator = vals[1];
+ 			var period = /(\d+)(\w+)/g.exec(vals[0]);
+ 			if(period.length!=3) {
+ 				err = "Invalid period: [" + vals[0] + "]";
+ 				throw err; 				
+ 			}
+ 			downsample.period = parseInt(period[1]);
+ 			downsample.unit = period[2];
+ 			return downsample;
+ 		} catch (e) {
+ 			if(err!=null) throw "Invalid downsample [" + value + "]: " + err;
+ 			throw "Invalid downsample [" + value + "]";
+ 		}
+
  	}
 
  	// parses a metric segment such as "avg:1m-avg:rate{counter,10,20}:sys.cpu{cpu=*,type=combined,host=PP-WK-NWHI-01}"
@@ -79,7 +170,7 @@
 	 			case 4: 			
 	 				metric.name=prefixes[3];
 	 				metric.rate=prefixes[2];
-	 				metric.downsample=prefixes[1];
+	 				metric.downsample=OpenTSDBURL._parseDownsample(prefixes[1]);
 	 				metric.aggregator=prefixes[0];
 	 				break;
 	 			case 3:     /// can be avg:rate:sys.cpu{cpu=*,type=combined,host=PP-WK-NWHI-01}    OR    avg:1m-avg:sys.cpu{cpu=*,type=combined,host=PP-WK-NWHI-01}
@@ -88,7 +179,7 @@
 	 				if(prefixes[1].indexOf("rate")!=-1) {
 	 					metric.rate=prefixes[1];
 	 				} else {
-	 					metric.downsample=prefixes[1];
+	 					metric.downsample=OpenTSDBURL._parseDownsample(prefixes[1]);
 	 				}
 	 				break;
 	 			case 2:
@@ -96,56 +187,13 @@
 	 				metric.aggregator=prefixes[0];
 	 		}	
 	 		if(metric.rate && rateCounterIdx != -1) {
-	 			// rate can be:
-	 				// rate
-	 				// rate{opts}
-	 					// counter
-	 					// counter, max
-	 					// counter ,, reset
-	 					// counter, max, reset
-	 			var rate = {};
-	 			var rateOptions = /\{(.*?)\}/g.exec(metric.rate)[1].split(',');
-	 			var max = null, reset = null;
-	 			switch(rateOptions.length) {
-	 				case 1:
-	 					rate.counter = 'counter';
-	 					break;
-	 				case 2:
-	 					rate.counter = 'counter';
-	 					max = OpenTSDBURL._getInt(rateOptions[1]);	 					
-	 					if(max) rate.max = max;
-	 					break;
-	 				case 3:
-	 					rate.counter = 'counter';
-	 					max = OpenTSDBURL._getInt(rateOptions[1]);	 					
-	 					if(max) rate.max = max;
-	 					reset = OpenTSDBURL._getInt(rateOptions[2]);	 					
-	 					if(reset) rate.reset = reset;
-	 					break;	 				
-	 			}
-	 			metric.rate = rate;
+	 			metric.rate = OpenTSDBURL._parseRate(metric.rate);
 	 		}
+
 	 		console.group("Processing Tags from [%s]", m.substring(idx));
-	 		var tagDefs = /\{(.*?)\}/g.exec(m.substring(idx))[1].split(',');
-	 		for(var x = 0, y = tagDefs.length; x < y; x++) {
-	 			console.info("TAG PAIR: [%s]", tagDefs[x]);
-	 			if(tagDefs[x].indexOf("=")) {
-	 				var tagPair = tagDefs[x].split("=");
-	 				if(tagPair.length==2) {
-	 					tagPair[0] = tagPair[0].trim();
-	 					tagPair[1] = tagPair[1].trim();
-	 					if(tagPair[0]!='' && tagPair[1]!='') {
-	 						metric.tags[tagPair[0]] = tagPair[1];
- 						}
-	 				}
-	 			}
-	 		}
+	 		metric.tags = OpenTSDBURL._parseTags(m.substring(idx));
 	 		console.groupEnd();
 	 		this.data.metrics.push(metric);
-
-
-
-
 	 	} finally {
 	 		console.groupEnd();
 	 	}
