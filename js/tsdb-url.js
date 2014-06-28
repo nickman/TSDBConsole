@@ -42,18 +42,33 @@
  		];
  	}
 
+ 	OpenTSDBURL._getInt = function(value) {
+ 		if(typeof(value) != "string") return null;
+ 		try {
+ 			return parseInt(value.trim());
+ 		} catch (e) { return null; }
+ 	}
+
  	// parses a metric segment such as "avg:1m-avg:rate{counter,10,20}:sys.cpu{cpu=*,type=combined,host=PP-WK-NWHI-01}"
  	OpenTSDBURL.prototype._parseMetric = function(m) {
  		console.group("Parsing metric definition [%s]", m);
  		try {
-	 		var metric = {};
+	 		var metric = {
+	 			tags : {}
+	 		};
 	 		var rateCounterIdx = m.indexOf(":rate{");
-	 		console.info("Has Rate Counter: %s", rateCounterIdx!=-1);
-	 		var idx = m.indexOf("{", rateCounterIdx==-1, 0 : rateCounterIdx);
+	 		if(rateCounterIdx != -1) {
+	 			rateCounterIdx += 6;
+	 		}
+
+	 		
+	 		var idx = m.indexOf("{", rateCounterIdx==-1 ? 0 : rateCounterIdx+1);
+	 		console.info("Has Rate Counter: %s, rateIdx: %s, idx: %s", rateCounterIdx!=-1, rateCounterIdx, idx);
 	 		if(idx == -1) {
 	 			throw "No tag starter found in metric definition [" + m + "]";
 	 		}
-	 		var prefixes = m.substring(0, idx).split();
+	 		var prefixes = m.substring(0, idx).split(":");	 	
+	 		console.debug("Prefixes: (idx:%s, [%s]) [%s]", idx, m.substring(0, idx), JSON.stringify(prefixes));	
 	 		if(prefixes.length < 2) {
 	 			throw "Failed to parse metric prefixes. Less than 2 prefixes in  metric definition [" + m + "]";
 	 		}
@@ -80,7 +95,53 @@
 	 				metric.name=prefixes[1];
 	 				metric.aggregator=prefixes[0];
 	 		}	
-	 		
+	 		if(metric.rate && rateCounterIdx != -1) {
+	 			// rate can be:
+	 				// rate
+	 				// rate{opts}
+	 					// counter
+	 					// counter, max
+	 					// counter ,, reset
+	 					// counter, max, reset
+	 			var rate = {};
+	 			var rateOptions = /\{(.*?)\}/g.exec(metric.rate)[1].split(',');
+	 			var max = null, reset = null;
+	 			switch(rateOptions.length) {
+	 				case 1:
+	 					rate.counter = 'counter';
+	 					break;
+	 				case 2:
+	 					rate.counter = 'counter';
+	 					max = OpenTSDBURL._getInt(rateOptions[1]);	 					
+	 					if(max) rate.max = max;
+	 					break;
+	 				case 3:
+	 					rate.counter = 'counter';
+	 					max = OpenTSDBURL._getInt(rateOptions[1]);	 					
+	 					if(max) rate.max = max;
+	 					reset = OpenTSDBURL._getInt(rateOptions[2]);	 					
+	 					if(reset) rate.reset = reset;
+	 					break;	 				
+	 			}
+	 			metric.rate = rate;
+	 		}
+	 		console.group("Processing Tags from [%s]", m.substring(idx));
+	 		var tagDefs = /\{(.*?)\}/g.exec(m.substring(idx))[1].split(',');
+	 		for(var x = 0, y = tagDefs.length; x < y; x++) {
+	 			console.info("TAG PAIR: [%s]", tagDefs[x]);
+	 			if(tagDefs[x].indexOf("=")) {
+	 				var tagPair = tagDefs[x].split("=");
+	 				if(tagPair.length==2) {
+	 					tagPair[0] = tagPair[0].trim();
+	 					tagPair[1] = tagPair[1].trim();
+	 					if(tagPair[0]!='' && tagPair[1]!='') {
+	 						metric.tags[tagPair[0]] = tagPair[1];
+ 						}
+	 				}
+	 			}
+	 		}
+	 		console.groupEnd();
+	 		this.data.metrics.push(metric);
 
 
 
