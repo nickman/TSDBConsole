@@ -72,7 +72,7 @@
 				// counter ,, reset
 				// counter, max, reset
 		var rate = {};
-		var rateOptions = /\{(.*?)\}/g.exec(metric.rate)[1].split(',');
+		var rateOptions = /\{(.*?)\}/g.exec(value)[1].split(',');
 		var max = null, reset = null;
 		switch(rateOptions.length) {
 			case 1:
@@ -91,7 +91,7 @@
 				if(reset) rate.reset = reset;
 				break;	 				
 		}
-		metric.rate = rate;
+		return rate;
  	}
 
 	OpenTSDBURL._parseTags = function(value) { 	
